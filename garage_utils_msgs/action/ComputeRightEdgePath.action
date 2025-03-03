@@ -1,0 +1,12 @@
+geometry_msgs/Polygon[] polygons   # 机器人要遍历的通道列表
+float64 frequency                  # path 的生成频率
+---
+bool success                       # 是否成功执行
+---
+uint8 counts                       # 通道列表元素个数           
+uint8 index                        # 当前通道列表所引值
+nav_msgs/Path path                 # 当前生成的path
+
+
+
+
