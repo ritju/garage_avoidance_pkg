@@ -31,13 +31,12 @@ find_package(nav_msgs REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   #---msg--
   #---srv---
-  "srv/SortChannels.srv"
   #---action---
   "action/ComputeRightEdgePath.action"
   "action/LookupVacantParkingSpace.action"  
   
   
-  DEPENDENCIES sensor_msgs geometry_msgs nav_msgs
+  DEPENDENCIES sensor_msgs geometry_msgs nav_msgs  
  )
 
 if(BUILD_TESTING)

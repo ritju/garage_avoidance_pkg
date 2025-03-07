@@ -1,5 +1,5 @@
 geometry_msgs/Polygon[] polygons   # 机器人要遍历的通道列表
-float64 frequency                  # path 的生成频率
+geometry_msgs/PoseStamped car_pose # 汽车的位置信息
 ---
 bool success                       # 是否成功执行
 ---

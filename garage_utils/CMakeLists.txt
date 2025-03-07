@@ -11,11 +11,19 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(garage_utils_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
 set(dependencies 
   rclcpp
   rclcpp_action
   rclcpp_components
   garage_utils_msgs
+  nav_msgs
+  tf2_geometry_msgs
+  tf2
+  tf2_ros
   )
 
 if(BUILD_TESTING)
