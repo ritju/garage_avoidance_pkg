@@ -264,7 +264,7 @@ void traverseRect(std::vector<EnhancedRect>& rects,  int current_idx,
     seg2x = rect.middle_long_line[1].first;
     seg2y = rect.middle_long_line[1].second;
     point_start = find_neareast_point(px, py, seg1x, seg1y, seg2x, seg2y);
-    if (rect.adjacent_rect_selected == -1)
+    if (rect.adjacent_rect_selected == -1) // 最后一个矩形框
     {
         double distance1, distance2;
         distance1 = distance(point_start.first, point_start.second, seg1x, seg1y);
@@ -279,31 +279,56 @@ void traverseRect(std::vector<EnhancedRect>& rects,  int current_idx,
         {
             point_middle = {seg2x, seg2y};
             point_end = {seg1x, seg1y};
-        }
-
-        // 第一段path
-        std::pair<double, double> dir1 = {point_middle.first - point_start.first, point_middle.second - point_start.second};
-        int edge1_index = selectRightEdge(rect, dir1);
-        auto edge1 = rect.edges[edge1_index];
-        auto path1_point_start = find_neareast_point(point_start.first, point_start.second, rect.vertices[edge1.first].x, rect.vertices[edge1.first].y, rect.vertices[edge1.second].x, rect.vertices[edge1.second].y);
-        auto path1_point_end   = find_neareast_point(point_middle.first, point_middle.second, rect.vertices[edge1.first].x, rect.vertices[edge1.first].y, rect.vertices[edge1.second].x, rect.vertices[edge1.second].y);
-        // 第二段path
-        std::pair<double, double> dir2 = {point_end.first - point_middle.first, point_end.second - point_middle.second};
-        int edge2_index = selectRightEdge(rect, dir2);
-        auto edge2 = rect.edges[edge2_index];
-        auto path2_point_start = find_neareast_point(point_middle.first, point_middle.second, rect.vertices[edge2.first].x, rect.vertices[edge2.first].y, rect.vertices[edge2.second].x, rect.vertices[edge2.second].y);
-        auto path2_point_end   = find_neareast_point(point_end.first, point_end.second, rect.vertices[edge2.first].x, rect.vertices[edge2.first].y, rect.vertices[edge2.second].x, rect.vertices[edge2.second].y);        
-
-        path.push_back(path1_point_start);
-        path.push_back(path1_point_end);
-        path.push_back(path2_point_start);
-        path.push_back(path2_point_end);
+        }        
     }
-    else
+    else //还有相邻的矩形框
     {
-
+        auto rect_next = rects_ordered[rect.adjacent_rect_selected];
+        double rect_next_center_x, rect_next_center_y;
+        for (size_t i = 0; i < rect_next.vertices.size(); i++)
+        {
+            rect_next_center_x += rect_next.vertices[i].x;
+            rect_next_center_y += rect_next.vertices[i].y;
+        }
+        rect_next_center_x /= rect_next.vertices.size();
+        rect_next_center_y /= rect_next.vertices.size();
+        double dx,dy, dx1,dy1;
+        dx = rect_next_center_x - px;
+        dy = rect_next_center_y - py;
+        dx1 = seg1x - px;
+        dy1 = seg1y - py;
+        double dot = dx * dx1 + dy * dy1;
+        if (dot < 0)
+        {
+            point_middle = {seg2x, seg2y};
+            point_end = {seg1x, seg1y};
+        }
+        else
+        {
+            point_middle = {seg1x, seg1y};
+            point_end = {seg2x, seg2y};
+        }
     }
-    selectRightEdge(rect, );
+
+    // 根据三个点的顺序生成path
+    // 第一段path
+    std::pair<double, double> dir1 = {point_middle.first - point_start.first, point_middle.second - point_start.second};
+    int edge1_index = selectRightEdge(rect, dir1);
+    auto edge1 = rect.edges[edge1_index];
+    auto path1_point_start = find_neareast_point(point_start.first, point_start.second, rect.vertices[edge1.first].x, rect.vertices[edge1.first].y, rect.vertices[edge1.second].x, rect.vertices[edge1.second].y);
+    auto path1_point_end   = find_neareast_point(point_middle.first, point_middle.second, rect.vertices[edge1.first].x, rect.vertices[edge1.first].y, rect.vertices[edge1.second].x, rect.vertices[edge1.second].y);
+    // 第二段path
+    std::pair<double, double> dir2 = {point_end.first - point_middle.first, point_end.second - point_middle.second};
+    int edge2_index = selectRightEdge(rect, dir2);
+    auto edge2 = rect.edges[edge2_index];
+    auto path2_point_start = find_neareast_point(point_middle.first, point_middle.second, rect.vertices[edge2.first].x, rect.vertices[edge2.first].y, rect.vertices[edge2.second].x, rect.vertices[edge2.second].y);
+    auto path2_point_end   = find_neareast_point(point_end.first, point_end.second, rect.vertices[edge2.first].x, rect.vertices[edge2.first].y, rect.vertices[edge2.second].x, rect.vertices[edge2.second].y);        
+
+    path.push_back(path1_point_start);
+    path.push_back(path1_point_end);
+    path.push_back(path2_point_start);
+    path.push_back(path2_point_end);
+
   }
 
   std::vector<std::pair<double, double>> offset(double dis, std::pair<double, double> pt1, std::pair<double, double> pt2) 
@@ -334,8 +359,8 @@ void traverseRect(std::vector<EnhancedRect>& rects,  int current_idx,
     return {new_pt1, new_pt2};  // 返回包含两个点的vector‌
   } 
 
-  std::vector<EnhancedRect> rect_origin;
-  std::vector<EnhancedRect> rect_ordered;
+  std::vector<EnhancedRect> rects_origin;
+  std::vector<EnhancedRect> rects_ordered;
 
   bool isPointOnSegment(double px, double py, double x1, double y1, double x2, double y2);
 
