@@ -1,5 +1,5 @@
-#ifndef GARAGE_UTILS__COMPUTE_RIGHT_EDGE_PATH_H_
-#define GARAGE_UTILS__COMPUTE_RIGHT_EDGE_PATH_H_
+#ifndef GARAGE_UTILS__COMPUTE_RIGHT_EDGE_PATH_HPP_
+#define GARAGE_UTILS__COMPUTE_RIGHT_EDGE_PATH_HPP_
 
 #include <functional>
 #include <memory>
@@ -18,28 +18,11 @@
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2/utils.h"
 
+#include "garage_utils/types.hpp"
+
 namespace garage_utils_pkg
 {
-
-// 顶点结构体（包含极角信息）
-struct Vertex 
-{
-    double x, y;
-    double angle; // 相对于矩形中心的极角
-};
-
-// 矩形结构体（增强版）
-struct EnhancedRect 
-{
-    std::vector<Vertex> vertices;                             // 顶点集合（需排序后使用）
-    std::vector<std::pair<size_t, size_t>> edges;             // 边集合（存储顶点索引）
-    std::vector<size_t> adjacent_rects;                       // 相邻矩形索引列表
-    size_t adjacent_rect_selected;                            // 最终选择的下个矩形索引值， -1代表最后一个
-    bool visited = false;                                     // 遍历标记
-    size_t index;                                             // 矩形索引值，用于调试矩形排序结果
-    std::vector<std::pair<double, double>> middle_long_line;  // 矩形两条长边决定的遍历过程要覆盖的路径
-};
-
+    
 class ComputeRightEdgePathActionServer : public rclcpp::Node
 {
 public:
@@ -223,6 +206,74 @@ void traverseRect(std::vector<EnhancedRect>& rects,  int current_idx,
         traverseRect(rects, adj, rects_ordered, { new_dx, new_dy },  path);
     }
 }
+
+  // 计算两条边的距离
+  double compute_distance_of_two_edges(Point edge1_pt1, Point edge1_pt2, Point edge2_pt1, Point edge2_pt2)
+  {
+    double cx1,cy1, cx2,cy2;
+    cx1 = (edge1_pt1.first + edge1_pt2.first) / 2.0;
+    cy1 = (edge1_pt1.second + edge1_pt2.second) / 2.0;
+    cx2 = (edge2_pt1.first + edge2_pt2.first) / 2.0;
+    cy2 = (edge2_pt1.second + edge2_pt2.second) / 2.0;
+    double distance1 = point_to_line_distance_smart(cx1, cy1, edge2_pt1.first, edge2_pt1.second, edge2_pt2.first, edge2_pt2.second);
+    double distance2 = point_to_line_distance_smart(cx2, cy2, edge1_pt1.first, edge1_pt1.second, edge1_pt2.first, edge1_pt2.second);
+    return (distance1 < distance2 ? distance1 : distance2);
+  }
+
+  // 计算两个矩形的距离
+  double compute_distance_of_two_rects(const EnhancedRect& rect1, const EnhancedRect& rect2)
+  {
+    double distance_min = std::numeric_limits<double>::max();
+    for (size_t i = 0; i < rect1.edges.size(); i++)
+    {
+        for (size_t j = 0; j < rect2.edges.size(); j++)
+        {
+            Point edge1_pt1, edge1_pt2, edge2_pt1, edge2_pt2;
+            edge1_pt1.first = rect1.vertices[rect1.edges[i].first].x;
+            edge1_pt1.second = rect1.vertices[rect1.edges[i].first].y;
+            edge1_pt2.first = rect1.vertices[rect1.edges[i].second].x;
+            edge1_pt2.second = rect1.vertices[rect1.edges[i].second].y;
+            double distance_current = compute_distance_of_two_edges(edge1_pt1, edge1_pt2, edge2_pt1, edge2_pt2);
+            if (distance_current < distance_min)
+            {
+                distance_min = distance_current;
+            }
+        }
+    }
+    return distance_min;
+  }
+
+  // 判断size_t变量是否存在与std::vector<size_t>中
+  bool existsInVector(size_t var, std::vector<size_t> vec)
+  {
+    return std::find(vec.begin(), vec.end(), var) != vec.end();
+  }
+
+  // 构建矩形列表的相邻关系    
+  void generate_rects_neighbored(std::vector<EnhancedRect> & rects, double dis_thr)
+  {
+    for (size_t i = 0;i < rects.size() - 1; i++)
+    {
+        for (size_t j = 0; j < rects.size(); j++)
+        {
+            auto rect1 = rects[i];
+            auto rect2 = rects[j];
+            double two_rect_distance = compute_distance_of_two_rects(rect1, rect2);
+            if (two_rect_distance < dis_thr)
+            {
+                if (existsInVector(j, rects[i].adjacent_rects))
+                {
+                    rects[i].adjacent_rects.push_back(j);
+                }
+                if (existsInVector(i, rects[j].adjacent_rects))
+                {
+                    rects[j].adjacent_rects.push_back(i);
+                }                
+            }
+        }
+    }
+  }
+
   // 找到某一个点在线段上离它最近的点  
   std::pair<double, double> find_neareast_point(double px, double py, double seg1x, double seg1y, double seg2x, double seg2y)
   {
