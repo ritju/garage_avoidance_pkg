@@ -225,7 +225,7 @@ namespace garage_utils_pkg
                                 for (size_t j = 0; j < edge.adjacent_vec.size() && !edge.deleted; j++)
                                 {
                                         auto edge_adjacent = edges[edge.adjacent_vec[j]];
-                                        process_intersected_edges(edge, edge_adjacent);
+                                        process_intersected_edges(edge, edge_adjacent, edges);
                                 }
                         }
                         else
@@ -307,12 +307,167 @@ namespace garage_utils_pkg
                         return (distance(px, py, x1, y1) + distance(px, py, x2, y2)) / 2.0;
                 }
         }
-
-        void GenerateModel::process_intersected_edges(Edge& edge1, Edge& edge2)
+        
+        // 相交的两种情况
+        // 1、顶点和顶点相交  => 相交的两个顶点合并为一个顶点，取两个顶点的中心位置为两条边的新顶点，为采用edge1的相交顶点索引值
+        // 2、顶点和边体相交  => 在边体上取交点做为新顶点，新顶点采用相交顶点的索引，相交边体拆分成两条新边。
+        void GenerateModel::process_intersected_edges(Edge& edge1, Edge& edge2, std::vector<Edge>& edges)
         {
-                
+                Point pt_intersection;  // 相交的顶点
+                Edge edge_body;         // 相交的边体
+                Point pt_intersection_2; // 顶点和顶点相交时的另一个顶点
+
+                // step 1: 找到相交的顶点
+                size_t index_intersection;
+                std::vector<Point> points_origin_vec;
+                points_origin_vec.push_back(edge1.pt1);
+                points_origin_vec.push_back(edge1.pt2);
+                points_origin_vec.push_back(edge2.pt1);
+                points_origin_vec.push_back(edge2.pt2);
+                double dis_min = std::numeric_limits<double>::max();
+                for (size_t i = 0; i < points_origin_vec.size(); i++)
+                {
+                        size_t point_index = i;
+                        size_t line_pt1_index, line_pt2_index, point_intersection_index;
+
+                        line_pt1_index = i < 2 ? 2 : 0;
+                        line_pt2_index = i < 2 ? 3 : 1;
+
+                        Point point = points_origin_vec[i];
+                        Point line_pt1 = points_origin_vec[line_pt1_index];
+                        Point line_pt2 = points_origin_vec[line_pt2_index];
+                        double dis_point_to_line = point_to_line_distance_smart(point.first, point.second, line_pt1.first, line_pt1.second, line_pt2.first, line_pt2.second);
+                        if (dis_point_to_line < dis_min)
+                        {
+                                dis_min = dis_point_to_line;
+                                index_intersection = i;
+                                edge_body = i > 1 ? edge1 : edge2;
+                                pt_intersection = points_origin_vec[index_intersection];
+                        }
+                }
+
+                // step2 判断相交类型是点与点相交还是点与边体相交。
+                double dis_pt_pt1, dis_pt_pt2; // 选出的相交顶点到边体两个顶点的距离
+                dis_pt_pt1 = distance(pt_intersection.first, pt_intersection.second, edge_body.pt1.first, edge_body.pt1.second);
+                dis_pt_pt2 = distance(pt_intersection.first, pt_intersection.second, edge_body.pt2.first, edge_body.pt2.second);
+                int intersection_type; // 0: 两个顶点相交， 1: 顶点与边体相交
+                if (dis_pt_pt1 == dis_min)
+                {
+                        intersection_type = 0;
+                        pt_intersection_2 = edge_body.pt1;
+                }
+                else if (dis_pt_pt2 == dis_min)
+                {
+                        intersection_type = 0;
+                        pt_intersection_2 = edge_body.pt2;
+                }
+                else
+                {
+                        intersection_type = 1;
+                }
+
+                // step3 合并顶点或拆分edge
+                if (!intersection_type) // 两个顶点相交=>合并顶点
+                {
+                        Point new_point;
+                        new_point.first = (pt_intersection.first + pt_intersection.first) / 2.0;
+                        new_point.second = (pt_intersection.second + pt_intersection.second) / 2.0;
+                        
+                        // 替换 new_point
+                        // todo 更新edge的其它信息
+                        if (index_intersection > 1) // 初始的相交顶点取在edge2上
+                        {
+                                // 更新edge2
+                                if (edge2.pt1.first == pt_intersection.first && edge2.pt1.second == pt_intersection.second)
+                                {
+                                        edge2.pt1 = new_point;
+                                }
+                                else
+                                {
+                                        edge2.pt2 = new_point;
+                                }
+                                // 更新edge1
+                                if (edge1.pt1.first == pt_intersection_2.first && edge1.pt1.second == pt_intersection_2.second)
+                                {
+                                        edge1.pt1 = new_point;
+                                }
+                                else
+                                {
+                                        edge1.pt2 = new_point;
+                                }
+                        }
+                        else // 初始的相交顶点取在edge1上
+                        {
+                                // 更新edge2
+                                if (edge2.pt1.first == pt_intersection_2.first && edge2.pt1.second == pt_intersection_2.second)
+                                {
+                                        edge2.pt1 = new_point;
+                                }
+                                else
+                                {
+                                        edge2.pt2 = new_point;
+                                }
+                                // 更新edge1
+                                if (edge1.pt1.first == pt_intersection.first && edge1.pt1.second == pt_intersection.second)
+                                {
+                                        edge1.pt1 = new_point;
+                                }
+                                else
+                                {
+                                        edge1.pt2 = new_point;
+                                }
+                        }
+                                            
+                }
+                else // 顶点和边体相交
+                {
+                        // 1、找到在边体上的交点
+                        auto point_new = find_neareast_point(pt_intersection.first, pt_intersection.second, 
+                                edge_body.pt1.first, edge_body.pt1.second,
+                                edge_body.pt2.first, edge_body.pt2.second);
+
+                        // 2、更新边体edge为两个新的edge
+                        Edge edge_new_1, edge_new_2;
+                        edge_new_1.pt1 = edge_body.pt1;
+                        edge_new_1.pt2 = point_new;
+                        edge_new_2.pt1 = point_new;
+                        edge_new_2.pt2 = edge_body.pt2;
+                        // 添加新edges到vector中
+                        edges.push_back(edge_new_1);
+                        edges.push_back(edge_new_2);                        
+                }
         }
 
+        // 找到某一个点在线段上离它最近的点  
+        Point GenerateModel::find_neareast_point(double px, double py, double seg1x, double seg1y, double seg2x, double seg2y)
+        {
+                // 计算线段方向向量分量
+                double dx = seg2x - seg1x;
+                double dy = seg2y - seg1y;
+                
+                // 处理线段退化为点的情况‌
+                if (dx == 0.0 && dy == 0.0) {
+                        return {seg1x, seg1y};
+                }
+                
+                // 计算点P到线段起点A的向量分量
+                double apx = px - seg1x;
+                double apy = py - seg1y;
+                
+                // 计算线段AB长度的平方和向量点积‌
+                double ab2 = dx * dx + dy * dy;
+                double ap_dot_ab = apx * dx + apy * dy;
+                
+                // 计算投影参数t并约束范围[0,1]
+                double t = ap_dot_ab / ab2;
+                t = std::max(0.0, std::min(1.0, t)); // 限制t在0~1之间
+                
+                // 根据t值计算最近点坐标‌
+                double nearest_x = seg1x + t * dx;
+                double nearest_y = seg1y + t * dy;
+                
+                return {nearest_x, nearest_y}; // 返回pair结构‌:
+        }
         
 
 } // end of namespace

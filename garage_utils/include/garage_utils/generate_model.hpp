@@ -45,7 +45,10 @@ public:
         void remove_edge(const Edge& edge);
 
         // 处理相交的边
-        void process_intersected_edges(Edge& edge1, Edge& edge2);
+        void process_intersected_edges(Edge& edge1, Edge& edge2, std::vector<Edge>& edges);
+
+        // 找到某一个点在线段上离它最近的点  
+        Point find_neareast_point(double px, double py, double seg1x, double seg1y, double seg2x, double seg2y);
 
 private:
         double dis_thr_;
