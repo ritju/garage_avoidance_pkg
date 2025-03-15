@@ -168,6 +168,7 @@ namespace garage_utils_pkg
         std::vector<Edge> GenerateModel::generate_edges(std::vector<EnhancedRect> rects)
         {
                 std::vector<Edge> edges;
+                int index = 0;
                 for (size_t i = 0; i < rects.size(); i++)
                 {
                         Edge edge;
@@ -235,6 +236,72 @@ namespace garage_utils_pkg
                         }
                 }
 
+        }
+
+        bool GenerateModel::is_neighbor(const Edge& e1, const Edge& e2, double dis_thr)
+        {
+                double edges_distance = compute_distance_of_two_edges(e1.pt1, e2.pt2, e1.pt1, e2.pt2);
+                return edges_distance < dis_thr;
+        }
+
+        bool GenerateModel::has_neighbor(const std::vector<Edge> edges, const Edge& edge, std::vector<std::pair<NeighborType,Edge>>& edges_neighbor_vec, double dis_thr)
+        {
+              bool ret = false;
+              edges_neighbor_vec.clear();
+              for (size_t i = 0; i < edges.size(); i++)
+              {
+                auto edge_compare = edges[i];
+                if (is_neighbor(edge, edge_compare, dis_thr))  
+                {
+                        ret = true;
+                        // 填充存储相邻edges对及相邻关系类型的vector
+                }
+                else
+                {
+                        continue;
+                }
+              }
+
+              return ret;
+        }
+
+        void GenerateModel::generate_points(std::vector<EnhancedPoint>& points, const std::vector<Edge>& edges)
+        {
+                // 先清空points
+                points.clear();
+
+                std::vector<Edge> edges_added; // 用来存放已经添加过的edges
+                int index = 0;
+
+                for (size_t i = 0; i < edges.size(); i++)
+                {
+                        auto edge = edges[i];
+                        if (edges_added.size() == 0) // 第一次遍历时
+                        {
+                           edges_added.push_back(edge);
+                           EnhancedPoint pt1, pt2;
+                           
+                           pt1.edge_index = i;
+                           pt1.index = index++;
+                           pt1.visited = false;
+                           pt1.coord = edge.pt1;
+
+                           pt2.edge_index = i;
+                           pt2.index = index++;
+                           pt2.visited = false;
+                           pt2.coord = edge.pt2;
+
+                           add_adjacent_relation(pt1, pt2);
+                           pt1.adjacent_vec.push_back(pt2.index);
+                           pt2.adjacent_vec.push_back(pt1.index);
+
+                           edges_added.push_back(edge);
+                        }
+                        else
+                        {
+
+                        }
+                }
         }
 
         void GenerateModel::add_adjacent_relation(EnhancedPoint& pt1, EnhancedPoint& pt2)

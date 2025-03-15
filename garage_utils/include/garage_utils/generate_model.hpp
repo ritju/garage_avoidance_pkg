@@ -50,6 +50,14 @@ public:
         // 找到某一个点在线段上离它最近的点  
         Point find_neareast_point(double px, double py, double seg1x, double seg1y, double seg2x, double seg2y);
 
+        // 判断两个edge是否相邻
+        bool is_neighbor(const Edge& e1, const Edge& e2, double dis_thr);
+
+        // edges_neighbor_vec用来存储相邻的edge及相邻类型。0: 两个顶点相交， 1: 顶点与边体相交
+        bool has_neighbor(const std::vector<Edge> edges, const Edge& edge, std::vector<std::pair<NeighborType, Edge>>& edges_neighbor_vec, double dis_thr);
+
+        void generate_points(std::vector<EnhancedPoint>& points, const std::vector<Edge>& edges);
+
 private:
         double dis_thr_;
         std::vector<std::vector<Point>>    rects_;     // 输入
