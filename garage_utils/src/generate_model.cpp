@@ -8,6 +8,7 @@ namespace garage_utils_pkg
                 this->rects_ = rects;
                 this->node_ = node;
                 this->dis_thr_ = dis_thr;
+                index = 0;
                 RCLCPP_INFO(node_->get_logger(), "GenerateModel constructor.");
                 check_rects(rects_);
                 print_rects(rects_);
@@ -168,12 +169,16 @@ namespace garage_utils_pkg
         std::vector<Edge> GenerateModel::generate_edges(std::vector<EnhancedRect> rects)
         {
                 std::vector<Edge> edges;
-                int index = 0;
                 for (size_t i = 0; i < rects.size(); i++)
                 {
                         Edge edge;
                         edge.pt1 = rects[i].middle_long_line[0];
                         edge.pt2 = rects[i].middle_long_line[1];
+                        edge.pt1_index = index++;
+                        edge.pt2_index = index++;
+                        edge.rect_index = i;
+                        edge.dis = distance(edge.pt1.first, edge.pt1.second, edge.pt2.first, edge.pt2.second);
+                        edge.adjacent_vec = std::vector<int>();
                         edges.push_back(edge);
                 }
                 return edges;
@@ -181,61 +186,14 @@ namespace garage_utils_pkg
 
         void GenerateModel::generate_model(const std::vector<EnhancedRect>& rects, double dis_thr)
         {
+                index = 0;
                 auto edges = generate_edges(rects);    
                 size_t edges_size = edges.size();
                 assert_(edges_size > 0, "edges's size shall > 0");
 
-                // 添加相邻关系信息
-                for (size_t i = 0; i < edges_size - 1; i++)
-                {
-                        for (size_t j = i + 1; j < edges_size; j++)
-                        {
-                                double edges_distance = compute_distance_of_two_edges(edges[i].pt1, edges[i].pt2, edges[j].pt1, edges[j].pt2);
-                                if (edges_distance < dis_thr)
-                                {
-                                        edges[i].adjacent_vec.push_back(j);
-                                        edges[j].adjacent_vec.push_back(i);
-                                }
-                                else
-                                {
-                                        continue;
-                                }
-                        }
-                }
-
-                // 初始化points;
+                // 先清空points_
                 points_.clear();
-                int index = 0;
-                for (size_t i = 0; i < edges.size(); i++)
-                {
-                        EnhancedPoint e_pt1, e_pt2;
-                        e_pt1.visited = false;
-                        e_pt2.visited = false;
-                        e_pt1.index = index++;
-                        e_pt2.index = index++;
-                        add_adjacent_relation(e_pt1, e_pt2);
-                        edges[i].pt1_index = e_pt1.index;
-                        edges[i].pt2_index = e_pt2.index;
-                }
-
-                for (size_t i = 0; i < edges.size(); i++)
-                {
-                        auto edge = edges[i];
-                        if (edge.adjacent_vec.size() > 0)
-                        {
-                                for (size_t j = 0; j < edge.adjacent_vec.size() && !edge.deleted; j++)
-                                {
-                                        auto edge_adjacent = edges[edge.adjacent_vec[j]];
-                                        process_intersected_edges(edge, edge_adjacent, edges);
-                                }
-                        }
-                        else
-                        {
-                                RCLCPP_WARN(node_->get_logger(), "edge %zd has 0 adjacent edge.[(%f, %f), (%f, %f)]",
-                                        i, edge.pt1.first, edge.pt1.second, edge.pt2.first, edge.pt2.second );
-                        }
-                }
-
+                generate_points(points_, edges, dis_thr);
         }
 
         bool GenerateModel::is_neighbor(const Edge& e1, const Edge& e2, double dis_thr)
@@ -244,63 +202,77 @@ namespace garage_utils_pkg
                 return edges_distance < dis_thr;
         }
 
-        bool GenerateModel::has_neighbor(const std::vector<Edge> edges, const Edge& edge, std::vector<std::pair<NeighborType,Edge>>& edges_neighbor_vec, double dis_thr)
+        void GenerateModel::generate_points(std::vector<EnhancedPoint>& points, const std::vector<Edge>& edges, double dis_thr)
         {
-              bool ret = false;
-              edges_neighbor_vec.clear();
-              for (size_t i = 0; i < edges.size(); i++)
-              {
-                auto edge_compare = edges[i];
-                if (is_neighbor(edge, edge_compare, dis_thr))  
-                {
-                        ret = true;
-                        // 填充存储相邻edges对及相邻关系类型的vector
-                }
-                else
-                {
-                        continue;
-                }
-              }
-
-              return ret;
-        }
-
-        void GenerateModel::generate_points(std::vector<EnhancedPoint>& points, const std::vector<Edge>& edges)
-        {
-                // 先清空points
-                points.clear();
-
                 std::vector<Edge> edges_added; // 用来存放已经添加过的edges
-                int index = 0;
 
                 for (size_t i = 0; i < edges.size(); i++)
                 {
                         auto edge = edges[i];
                         if (edges_added.size() == 0) // 第一次遍历时
                         {
-                           edges_added.push_back(edge);
-                           EnhancedPoint pt1, pt2;
+                           EnhancedPoint e_pt1, e_pt2;
                            
-                           pt1.edge_index = i;
-                           pt1.index = index++;
-                           pt1.visited = false;
-                           pt1.coord = edge.pt1;
+                           e_pt1.index = edge.pt1_index;
+                           e_pt1.visited = false;
+                           e_pt1.coord = edge.pt1;
 
-                           pt2.edge_index = i;
-                           pt2.index = index++;
-                           pt2.visited = false;
-                           pt2.coord = edge.pt2;
-
-                           add_adjacent_relation(pt1, pt2);
-                           pt1.adjacent_vec.push_back(pt2.index);
-                           pt2.adjacent_vec.push_back(pt1.index);
-
+                           e_pt2.index = edge.pt2_index;
+                           e_pt2.visited = false;
+                           e_pt2.coord = edge.pt2;
+                           
+                           add_adjacent_relation(e_pt1, e_pt2);
                            edges_added.push_back(edge);
+                           points.push_back(e_pt1);
+                           points.push_back(e_pt2);
                         }
                         else
                         {
-
+                                for (size_t j = 0; j < edges_added.size(); j++)
+                                {
+                                        auto edge_compare = edges_added[j];
+                                        if (is_neighbor(edge, edge_compare, dis_thr))
+                                        {
+                                                std::vector<Edge> edges_tmp;
+                                                process_intersected_edges(edge, edge_compare, edges_tmp, points);
+                                                merge_edges(edges_added, j, edges_tmp);
+                                        }
+                                }
                         }
+                }
+
+                // 填充points
+                for (size_t i = 0; i < edges_added.size(); i++)
+                {
+                        EnhancedPoint e_pt1, e_pt2;
+                        Point pt1, pt2;
+                        pt1 = edges_added[i].pt1;
+                        pt2 = edges_added[i].pt2;
+
+                        e_pt1.coord = pt1;
+                        e_pt1.visited = false;
+                        // todo 
+                        // e_pt1.adjacent_vec = ;
+
+                        e_pt2.coord = pt2;
+                        e_pt2.visited = false;
+                        // todo 
+                        // e_pt2.adjacent_vec = ;
+
+                        points.push_back(e_pt1);
+                        points.push_back(e_pt2);
+                }
+        }
+
+        void GenerateModel::merge_edges(std::vector<Edge> edges_origin, int index, std::vector<Edge> edges_tmp)
+        {
+                assert_(index < edges_origin.size(), "index i shall less than vector edges_origin's size.");
+                assert_(index > 0, "index i shall > 0.");
+                edges_origin.erase(edges_origin.begin() + index);
+                assert_(edges_tmp.size() > 0, "edges_tmp's size shall > 0.");
+                for (size_t i = 0; i < edges_tmp.size(); i++)
+                {
+                        edges_origin.push_back(edges_tmp[i]);
                 }
         }
 
@@ -378,8 +350,9 @@ namespace garage_utils_pkg
         // 相交的两种情况
         // 1、顶点和顶点相交  => 相交的两个顶点合并为一个顶点，取两个顶点的中心位置为两条边的新顶点，为采用edge1的相交顶点索引值
         // 2、顶点和边体相交  => 在边体上取交点做为新顶点，新顶点采用相交顶点的索引，相交边体拆分成两条新边。
-        void GenerateModel::process_intersected_edges(Edge& edge1, Edge& edge2, std::vector<Edge>& edges)
+        void GenerateModel::process_intersected_edges(Edge& edge1, Edge& edge2, std::vector<Edge>& edges_tmp, std::vector<EnhancedPoint>& points)
         {
+                edges_tmp.clear();
                 Point pt_intersection;  // 相交的顶点
                 Edge edge_body;         // 相交的边体
                 Point pt_intersection_2; // 顶点和顶点相交时的另一个顶点
@@ -417,91 +390,208 @@ namespace garage_utils_pkg
                 double dis_pt_pt1, dis_pt_pt2; // 选出的相交顶点到边体两个顶点的距离
                 dis_pt_pt1 = distance(pt_intersection.first, pt_intersection.second, edge_body.pt1.first, edge_body.pt1.second);
                 dis_pt_pt2 = distance(pt_intersection.first, pt_intersection.second, edge_body.pt2.first, edge_body.pt2.second);
-                int intersection_type; // 0: 两个顶点相交， 1: 顶点与边体相交
+                NeighborType intersection_type; // 0: 两个顶点相交， 1: 顶点与边体相交
                 if (dis_pt_pt1 == dis_min)
                 {
-                        intersection_type = 0;
+                        intersection_type = NeighborType::POINT_POINT;
                         pt_intersection_2 = edge_body.pt1;
                 }
                 else if (dis_pt_pt2 == dis_min)
                 {
-                        intersection_type = 0;
+                        intersection_type = NeighborType::POINT_POINT;
                         pt_intersection_2 = edge_body.pt2;
                 }
                 else
                 {
-                        intersection_type = 1;
+                        intersection_type = NeighborType::POINT_LINE;
                 }
 
                 // step3 合并顶点或拆分edge
-                if (!intersection_type) // 两个顶点相交=>合并顶点
+                switch(intersection_type)
                 {
-                        Point new_point;
-                        new_point.first = (pt_intersection.first + pt_intersection.first) / 2.0;
-                        new_point.second = (pt_intersection.second + pt_intersection.second) / 2.0;
-                        
-                        // 替换 new_point
-                        // todo 更新edge的其它信息
-                        if (index_intersection > 1) // 初始的相交顶点取在edge2上
+                        case NeighborType::POINT_POINT:  // 两个顶点相交=>合并顶点
                         {
-                                // 更新edge2
-                                if (edge2.pt1.first == pt_intersection.first && edge2.pt1.second == pt_intersection.second)
+                                Point new_point;
+                                new_point.first = (pt_intersection.first + pt_intersection.first) / 2.0;
+                                new_point.second = (pt_intersection.second + pt_intersection.second) / 2.0;
+
+                                EnhancedPoint e_edge1_pt1, e_edge1_pt2, e_edge2_pt1, e_edge2_pt2;
+                                
+                                // edge1是需要新增加的边,edge2是已经增加的边。
+                                e_edge1_pt1.index = edge1.pt1_index;
+                                e_edge1_pt1.coord = edge1.pt1;
+                                e_edge1_pt1.visited = false;
+                                
+                                //  更新两个edge的交点的坐标值、顶点间的相邻关系
+                                int index_new;
+                                if (index_intersection < 1) // 初始的相交顶点取在edge2上
                                 {
-                                        edge2.pt1 = new_point;
+                                        // 更新edge2的交点的坐标值 => 替换相交的顶点
+                                        if (edge2.pt1.first == pt_intersection.first && edge2.pt1.second == pt_intersection.second)
+                                        {
+                                                edge2.pt1 = new_point;
+                                                index_new = edge2.pt1_index;
+
+                                                // 替换points中的坐标
+                                                for (size_t i = 0; i < points.size(); i++)
+                                                {
+                                                        if (points[i].index == edge2.pt1_index)
+                                                        {
+                                                                points[i].coord = edge2.pt1;
+                                                        }
+                                                }
+                                        }
+                                        else
+                                        {
+                                                edge2.pt2 = new_point;
+                                                index_new = edge2.pt2_index;
+                                                // 替换points中的坐标
+                                                for (size_t i = 0; i < points.size(); i++)
+                                                {
+                                                        if (points[i].index == edge2.pt2_index)
+                                                        {
+                                                                points[i].coord = edge2.pt2;
+                                                        }
+                                                }
+                                        }
+
+                                        // 更新edge1的交点的坐标值 => 替换相交的顶点
+                                        if (edge1.pt1.first == pt_intersection_2.first && edge1.pt1.second == pt_intersection_2.second)
+                                        {
+                                                edge1.pt1 = new_point;
+                                                edge1.pt1_index = index_new;
+                                                // 增加另一个点到points中
+                                                EnhancedPoint e_point_new;
+                                                e_point_new.coord = edge1.pt2;
+                                                e_point_new.index = edge1.pt2_index;
+                                                e_point_new.visited = false;
+                                                for (size_t i = 0; i < points.size(); i++)
+                                                {
+                                                        if (points[i].index == edge1.pt1_index)
+                                                        {
+                                                                add_adjacent_relation(points[i], e_point_new);
+                                                                points.push_back(e_point_new);
+                                                        }
+                                                }
+                                                
+                                        }
+                                        else
+                                        {
+                                                edge1.pt2 = new_point;
+                                                edge1.pt2_index = index_new;
+                                                // 增加另一个点到points中
+                                                EnhancedPoint e_point_new;
+                                                e_point_new.coord = edge1.pt1;
+                                                e_point_new.index = edge1.pt1_index;
+                                                e_point_new.visited = false;
+                                                for (size_t i = 0; i < points.size(); i++)
+                                                {
+                                                        if (points[i].index == edge1.pt2_index)
+                                                        {
+                                                                add_adjacent_relation(points[i], e_point_new);
+                                                                points.push_back(e_point_new);
+                                                        }
+                                                }
+                                        }
                                 }
-                                else
+                                else // 初始的相交顶点取在edge1上
                                 {
-                                        edge2.pt2 = new_point;
+                                        // 更新edge2的交点的坐标值  => 替换相交的顶点
+                                        if (edge2.pt1.first == pt_intersection_2.first && edge2.pt1.second == pt_intersection_2.second)
+                                        {
+                                                edge2.pt1 = new_point;
+                                                
+                                                index_new = edge2.pt1_index;
+                                                // 替换points中的坐标
+                                                for (size_t i = 0; i < points.size(); i++)
+                                                {
+                                                        if (points[i].index == edge2.pt1_index)
+                                                        {
+                                                                points[i].coord = edge2.pt1;
+                                                        }
+                                                }
+                                        }
+                                        else
+                                        {
+                                                edge2.pt2 = new_point;
+                                                index_new = edge2.pt2_index;
+                                                // 替换points中的坐标
+                                                for (size_t i = 0; i < points.size(); i++)
+                                                {
+                                                        if (points[i].index == edge2.pt2_index)
+                                                        {
+                                                                points[i].coord = edge2.pt2;
+                                                        }
+                                                }
+                                        }
+                                        // 更新edge1的交点的坐标值  => 替换相交的顶点
+                                        if (edge1.pt1.first == pt_intersection.first && edge1.pt1.second == pt_intersection.second)
+                                        {
+                                                edge1.pt1 = new_point;
+                                                
+                                                edge1.pt1_index = index_new;
+                                                // 增加另一个点到points中
+                                                EnhancedPoint e_point_new;
+                                                e_point_new.coord = edge1.pt2;
+                                                e_point_new.index = edge1.pt2_index;
+                                                e_point_new.visited = false;
+                                                for (size_t i = 0; i < points.size(); i++)
+                                                {
+                                                        if (points[i].index == edge1.pt1_index)
+                                                        {
+                                                                add_adjacent_relation(points[i], e_point_new);
+                                                                points.push_back(e_point_new);
+                                                        }
+                                                }
+                                        }
+                                        else
+                                        {
+                                                edge1.pt2 = new_point;                                                 
+                                                edge1.pt2_index = index_new;
+                                                // 增加另一个点到points中
+                                                EnhancedPoint e_point_new;
+                                                e_point_new.coord = edge1.pt1;
+                                                e_point_new.index = edge1.pt1_index;
+                                                e_point_new.visited = false;
+                                                for (size_t i = 0; i < points.size(); i++)
+                                                {
+                                                        if (points[i].index == edge1.pt2_index)
+                                                        {
+                                                                add_adjacent_relation(points[i], e_point_new);
+                                                                points.push_back(e_point_new);
+                                                        }
+                                                }
+                                        }
                                 }
-                                // 更新edge1
-                                if (edge1.pt1.first == pt_intersection_2.first && edge1.pt1.second == pt_intersection_2.second)
-                                {
-                                        edge1.pt1 = new_point;
-                                }
-                                else
-                                {
-                                        edge1.pt2 = new_point;
-                                }
+
+                                // 保存两个新edge到edges_tmp中
+                                edges_tmp.push_back(edge1);
+                                edges_tmp.push_back(edge2);
+                                break;
                         }
-                        else // 初始的相交顶点取在edge1上
+                        case NeighborType::POINT_LINE:   // 顶点和边体相交
                         {
-                                // 更新edge2
-                                if (edge2.pt1.first == pt_intersection_2.first && edge2.pt1.second == pt_intersection_2.second)
-                                {
-                                        edge2.pt1 = new_point;
-                                }
-                                else
-                                {
-                                        edge2.pt2 = new_point;
-                                }
-                                // 更新edge1
-                                if (edge1.pt1.first == pt_intersection.first && edge1.pt1.second == pt_intersection.second)
-                                {
-                                        edge1.pt1 = new_point;
-                                }
-                                else
-                                {
-                                        edge1.pt2 = new_point;
-                                }
-                        }
-                                            
-                }
-                else // 顶点和边体相交
-                {
-                        // 1、找到在边体上的交点
-                        auto point_new = find_neareast_point(pt_intersection.first, pt_intersection.second, 
+                                // 1、找到在边体上的交点
+                                auto point_new = find_neareast_point(pt_intersection.first, pt_intersection.second, 
                                 edge_body.pt1.first, edge_body.pt1.second,
                                 edge_body.pt2.first, edge_body.pt2.second);
 
-                        // 2、更新边体edge为两个新的edge
-                        Edge edge_new_1, edge_new_2;
-                        edge_new_1.pt1 = edge_body.pt1;
-                        edge_new_1.pt2 = point_new;
-                        edge_new_2.pt1 = point_new;
-                        edge_new_2.pt2 = edge_body.pt2;
-                        // 添加新edges到vector中
-                        edges.push_back(edge_new_1);
-                        edges.push_back(edge_new_2);                        
+                                // 2、更新边体edge为两个新的edge
+                                Edge edge_new_1, edge_new_2;
+                                edge_new_1.pt1 = edge_body.pt1;
+                                edge_new_1.pt2 = point_new;
+                                edge_new_2.pt1 = point_new;
+                                edge_new_2.pt2 = edge_body.pt2;
+                                // 添加新edges到vector中
+                                edges_tmp.push_back(edge_new_1);
+                                edges_tmp.push_back(edge_new_2);  
+
+                                // 更新points
+                                // 判断edge_body是已有edge还是新edge
+                                bool body_is_old_edge = edge_body.pt1_index == edge1.pt1_index;
+
+                                break;
+                        }
                 }
         }
 

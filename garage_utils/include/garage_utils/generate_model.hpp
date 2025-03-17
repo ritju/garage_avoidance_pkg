@@ -44,8 +44,6 @@ public:
         // 删除edge
         void remove_edge(const Edge& edge);
 
-        // 处理相交的边
-        void process_intersected_edges(Edge& edge1, Edge& edge2, std::vector<Edge>& edges);
 
         // 找到某一个点在线段上离它最近的点  
         Point find_neareast_point(double px, double py, double seg1x, double seg1y, double seg2x, double seg2y);
@@ -53,10 +51,12 @@ public:
         // 判断两个edge是否相邻
         bool is_neighbor(const Edge& e1, const Edge& e2, double dis_thr);
 
-        // edges_neighbor_vec用来存储相邻的edge及相邻类型。0: 两个顶点相交， 1: 顶点与边体相交
-        bool has_neighbor(const std::vector<Edge> edges, const Edge& edge, std::vector<std::pair<NeighborType, Edge>>& edges_neighbor_vec, double dis_thr);
+        // 处理相交的边
+        void process_intersected_edges(Edge& edge1, Edge& edge2, std::vector<Edge>& edges, std::vector<EnhancedPoint>& points);
 
-        void generate_points(std::vector<EnhancedPoint>& points, const std::vector<Edge>& edges);
+        void merge_edges(std::vector<Edge> edges_origin, int index, std::vector<Edge> edges_tmp);
+
+        void generate_points(std::vector<EnhancedPoint>& points, const std::vector<Edge>& edges, double dis_thr);
 
 private:
         double dis_thr_;
@@ -64,6 +64,7 @@ private:
         std::vector<EnhancedRect>          rects_tmp_;
         std::vector<EnhancedPoint>         points_;    // 输出
         rclcpp::Node::SharedPtr            node_;
+        int                                index;      // 生成points时的索引值。
         
 };
 

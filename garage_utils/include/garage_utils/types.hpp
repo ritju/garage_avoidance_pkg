@@ -11,7 +11,6 @@ namespace garage_utils_pkg
         struct EnhancedPoint
         {
                 int index;
-                int edge_index;
                 std::vector<int> adjacent_vec;
                 bool visited;
                 Point coord;
@@ -40,11 +39,11 @@ namespace garage_utils_pkg
                 Point pt2;
                 double dis;
                 std::vector<int> adjacent_vec;
-                bool has_child = false;
-                bool is_child = false;
-                int child1_index;
-                int child2_index;
-                int sibling_index;
+                // bool has_child = false;
+                // bool is_child = false;
+                // int child1_index;
+                // int child2_index;
+                // int sibling_index;
         };
 
         enum class SearchMethod
