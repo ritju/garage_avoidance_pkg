@@ -42,10 +42,30 @@ ament_target_dependencies(compute_right_edge_path_server ${dependencies})
 rclcpp_components_register_node(
   compute_right_edge_path_server PLUGIN "garage_utils_pkg::ComputeRightEdgePathActionServer" 
   EXECUTABLE compute_right_edge_path_server_node)
+
+add_library(generate_model SHARED
+  src/generate_model.cpp)
+target_include_directories(generate_model PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+ament_target_dependencies(generate_model ${dependencies})
+
+add_executable(test_generate_model src/test_generate_model.cpp)
+target_include_directories(test_generate_model PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_link_libraries(test_generate_model generate_model)
+ament_target_dependencies(test_generate_model ${dependencies})
+
 install(TARGETS
-  compute_right_edge_path_server
+  compute_right_edge_path_server generate_model test_generate_model
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
+
+install(TARGETS test_generate_model
+DESTINATION lib/${PROJECT_NAME})
+
+ament_export_libraries(test_generate_model)
 
 ament_package()

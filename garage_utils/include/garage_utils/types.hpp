@@ -31,19 +31,11 @@ namespace garage_utils_pkg
 
         struct Edge
         {
-                int index;
                 int pt1_index;
                 int pt2_index;
-                int rect_index;
                 Point pt1;
                 Point pt2;
                 double dis;
-                std::vector<int> adjacent_vec;
-                // bool has_child = false;
-                // bool is_child = false;
-                // int child1_index;
-                // int child2_index;
-                // int sibling_index;
         };
 
         enum class SearchMethod

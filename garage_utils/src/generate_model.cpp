@@ -3,17 +3,20 @@
 
 namespace garage_utils_pkg
 {
-        GenerateModel::GenerateModel(std::vector<std::vector<Point>> rects, rclcpp::Node::SharedPtr node, double dis_thr)
+        GenerateModel::GenerateModel(const std::vector<std::vector<Point>>& rects, rclcpp::Node::SharedPtr node, double dis_thr)
         {
                 this->rects_ = rects;
                 this->node_ = node;
                 this->dis_thr_ = dis_thr;
                 index = 0;
                 RCLCPP_INFO(node_->get_logger(), "GenerateModel constructor.");
+                RCLCPP_INFO(node_->get_logger(), "Check rects.");
                 check_rects(rects_);
+                RCLCPP_INFO(node_->get_logger(), "Print rects");
                 print_rects(rects_);
-                rects_tmp_ = rectify_rects(rects_);
-                // generate_model(rects_tmp_, this->dis_thr_); 
+                rects_tmp_ = init_rects(rects_);
+                RCLCPP_INFO(node_->get_logger(), "Begin to generate model.");
+                generate_model(rects_tmp_, this->dis_thr_); 
         }
 
         GenerateModel::~GenerateModel()
@@ -31,10 +34,12 @@ namespace garage_utils_pkg
 
         void GenerateModel::check_rects(std::vector<std::vector<Point>> rects)
         {
+                RCLCPP_INFO(node_->get_logger(), "rects size: %zd", rects.size());
                 assert_(rects.size() > 0, "rects's size shall > 0, error");
                 for (size_t i = 0; i < rects.size(); i++)
                 {
                         auto rect = rects[i];
+                        RCLCPP_INFO(node_->get_logger(), "rect points size: %zd", rect.size());
                         assert_(rect.size() == 4, "rect shall has 4 points.");
                         for (size_t j = 0; j < rect.size() - 1; j++)
                         {
@@ -46,39 +51,65 @@ namespace garage_utils_pkg
                 }
         }
 
-        void GenerateModel::print_rects(std::vector<std::vector<Point>> rects)
+        void GenerateModel::print_rects(const std::vector<std::vector<Point>>& rects)
         {
                 size_t size = rects.size();
-                RCLCPP_INFO(node_->get_logger(), "rests size: %zd", size);
+                RCLCPP_INFO(node_->get_logger(), "original rects size: %zd", size);
                 std::vector<std::stringstream> rects_ss;
                 for (size_t i = 0; i < size; i++)
                 {
                         auto rect = rects[i];
                         std::stringstream ss;
-                        ss << "rect " << i << " => [";
+                        ss << "rect " << i << " => [ ";
                         for (size_t j = 0; j < rect.size(); j++)
                         {
-                                ss << " (" << rect[j].first << ", " << rect[j].second << ")";
-                        }
-                        if (i != size - 1)
-                        {
-                                ss << ",";
-                        }
-                        else
-                        {
-                                ss<< " ";
+                                ss << "(" << rect[j].first << ", " << rect[j].second << ")";
+                                if (j != rect.size() - 1)
+                                {
+                                        ss << ", ";
+                                }
+                                else
+                                {
+                                        ss << " ";
+                                }
                         }
                         ss<< "]";
                         RCLCPP_INFO(node_->get_logger(), "%s", ss.str().c_str());
                 }
         }
 
-        std::vector<EnhancedRect> GenerateModel::rectify_rects(const std::vector<std::vector<Point>>& rects)
+        void GenerateModel::print_enhanced_rects(const std::vector<EnhancedRect>& rects)
         {
-                return init_rects(rects);
+                size_t size = rects.size();
+                RCLCPP_INFO(node_->get_logger(), "Enhanced rects size: %zd", size);
+                std::vector<std::stringstream> rects_ss;
+                for (size_t i = 0; i < size; i++)
+                {
+                        auto rect = rects[i];
+                        std::stringstream ss;
+                        ss << "rect " << i << " => [ ";
+                        for (size_t j = 0; j < rect.vertices.size(); j++)
+                        {
+                                ss << "(" << rect.vertices[j].x << ", " << rect.vertices[j].y << ", " << rect.vertices[j].angle << ")";
+                                if (j != rect.vertices.size() - 1)
+                                {
+                                        ss << ", ";
+                                }
+                                else
+                                {
+                                        ss << " ";
+                                }
+                        }
+                        ss<< "]";
+                        RCLCPP_INFO(node_->get_logger(), "%s", ss.str().c_str());
+                        RCLCPP_INFO(node_->get_logger(), "middle_long_line: (%.1f, %.1f), (%.1f, %.1f)",
+                                rect.middle_long_line[0].first, rect.middle_long_line[0].second, 
+                                rect.middle_long_line[1].first, rect.middle_long_line[1].second);
+                        RCLCPP_INFO(node_->get_logger(), "--------------------------");
+                }
         }
 
-        std::vector<EnhancedRect> GenerateModel::init_rects(std::vector<std::vector<Point>> rects)
+        std::vector<EnhancedRect> GenerateModel::init_rects(const std::vector<std::vector<Point>>& rects)
         {
                 std::vector<EnhancedRect> rects_ret;
                 for (size_t i = 0; i < rects.size(); i++)
@@ -97,6 +128,7 @@ namespace garage_utils_pkg
                         rects_ret.push_back(enhanced_rect);
 
                 }
+                print_enhanced_rects(rects_ret);
                 return rects_ret;
         }
 
@@ -108,9 +140,11 @@ namespace garage_utils_pkg
                 {
                         cx += v.x;
                         cy += v.y;
+                        // RCLCPP_INFO(node_->get_logger(), "x: %.1f, y: %.1f, cx: %.1f, cy: %.1f", v.x, v.y, cx, cy);
                 }
                 cx /= rect.vertices.size();
                 cy /= rect.vertices.size();
+                // RCLCPP_INFO(node_->get_logger(), "cx: %.1f, cy: %.1f", cx, cy);
 
                 // 计算各顶点极角并排序‌
                 for (auto& v : rect.vertices) 
@@ -118,11 +152,13 @@ namespace garage_utils_pkg
                         double dx = v.x - cx;
                         double dy = v.y - cy;
                         v.angle = atan2(dy, dx);  // 极角公式
+                        // RCLCPP_INFO(node_->get_logger(), "x: %.1f, y: %.1f, cx: %.1f, cy: %.1f", v.x, v.y, cx, cy);
+                        // RCLCPP_INFO(node_->get_logger(), "dx: %.1f, dy: %.1f, v.angle: %.2f", dx, dy, v.angle);
 
+                }
                 // 按极角升序排序（顺时针）
                 std::sort(rect.vertices.begin(), rect.vertices.end(), 
                         [](const Vertex& a, const Vertex& b) { return a.angle < b.angle; });
-                }
         }
 
         void GenerateModel::generate_middle_long_line(EnhancedRect& rect)
@@ -176,9 +212,7 @@ namespace garage_utils_pkg
                         edge.pt2 = rects[i].middle_long_line[1];
                         edge.pt1_index = index++;
                         edge.pt2_index = index++;
-                        edge.rect_index = i;
                         edge.dis = distance(edge.pt1.first, edge.pt1.second, edge.pt2.first, edge.pt2.second);
-                        edge.adjacent_vec = std::vector<int>();
                         edges.push_back(edge);
                 }
                 return edges;
@@ -264,11 +298,11 @@ namespace garage_utils_pkg
                 }
         }
 
-        void GenerateModel::merge_edges(std::vector<Edge> edges_origin, int index, std::vector<Edge> edges_tmp)
+        void GenerateModel::merge_edges(std::vector<Edge> edges_origin, int index_compare, std::vector<Edge> edges_tmp)
         {
-                assert_(index < edges_origin.size(), "index i shall less than vector edges_origin's size.");
-                assert_(index > 0, "index i shall > 0.");
-                edges_origin.erase(edges_origin.begin() + index);
+                assert_(index_compare < edges_origin.size(), "index_compare shall less than vector edges_origin's size.");
+                assert_(index_compare >= 0, "index_compare shall >= 0.");
+                edges_origin.erase(edges_origin.begin() + index_compare);
                 assert_(edges_tmp.size() > 0, "edges_tmp's size shall > 0.");
                 for (size_t i = 0; i < edges_tmp.size(); i++)
                 {
@@ -350,6 +384,7 @@ namespace garage_utils_pkg
         // 相交的两种情况
         // 1、顶点和顶点相交  => 相交的两个顶点合并为一个顶点，取两个顶点的中心位置为两条边的新顶点，为采用edge1的相交顶点索引值
         // 2、顶点和边体相交  => 在边体上取交点做为新顶点，新顶点采用相交顶点的索引，相交边体拆分成两条新边。
+        // edge1是需要新增加的边,edge2是已经增加的边。
         void GenerateModel::process_intersected_edges(Edge& edge1, Edge& edge2, std::vector<Edge>& edges_tmp, std::vector<EnhancedPoint>& points)
         {
                 edges_tmp.clear();
@@ -417,7 +452,6 @@ namespace garage_utils_pkg
 
                                 EnhancedPoint e_edge1_pt1, e_edge1_pt2, e_edge2_pt1, e_edge2_pt2;
                                 
-                                // edge1是需要新增加的边,edge2是已经增加的边。
                                 e_edge1_pt1.index = edge1.pt1_index;
                                 e_edge1_pt1.coord = edge1.pt1;
                                 e_edge1_pt1.visited = false;
@@ -587,8 +621,139 @@ namespace garage_utils_pkg
                                 edges_tmp.push_back(edge_new_2);  
 
                                 // 更新points
+                                EnhancedPoint e_pt_new_intersection; // 交点
+                                e_pt_new_intersection.coord = point_new;
+                                e_pt_new_intersection.visited = false;
+                                // e_pt_new_intersection.index = index++;
+
                                 // 判断edge_body是已有edge还是新edge
-                                bool body_is_old_edge = edge_body.pt1_index == edge1.pt1_index;
+                                bool body_is_old_edge = edge_body.pt1_index == edge2.pt1_index;
+                                if (body_is_old_edge)  // 除了交点，只需要增加一个点（新edge的另一个点）
+                                {
+                                        e_pt_new_intersection.index = index++;
+                                        // 赋值新edge的另一个点
+                                        auto point_tmp = edge1.pt1 == pt_intersection ? edge1.pt2 : edge1.pt1;
+                                        EnhancedPoint e_new_pt2;
+                                        e_new_pt2.coord = point_tmp;
+                                        e_new_pt2.visited = false;
+                                        e_new_pt2.index = index++;
+                                        // 删除原edge两个点的相邻关系,新增与交点的相邻关系
+                                        EnhancedPoint e_pt_old1, e_pt_old2;
+                                        for (size_t i = 0; i < points.size(); i++)                                      
+                                        {
+                                                if (points[i].index == edge2.pt1_index)
+                                                {
+                                                        e_pt_old1 = points[i];
+                                                }
+                                                else if (points[i].index == edge2.pt2_index)
+                                                {
+                                                        e_pt_old2 = points[i];
+                                                }
+                                        }
+                                        remove_adjacent_relation(e_pt_old1, e_pt_old2);
+                                        add_adjacent_relation(e_pt_old1, e_new_pt2);
+                                        add_adjacent_relation(e_pt_old2, e_new_pt2);
+                                        // 增加新edge的另一个点和交点的相邻关系
+                                        add_adjacent_relation(e_new_pt2, e_pt_new_intersection);
+
+                                        Edge edge_new_1, edge_new_2, edge_new_3;
+
+                                        edge_new_1.pt1_index = e_pt_old1.index;
+                                        edge_new_1.pt1 = e_pt_old1.coord;
+                                        edge_new_1.pt2_index = e_pt_new_intersection.index;
+                                        edge_new_1.pt2 = e_pt_new_intersection.coord;
+
+                                        edge_new_2.pt1_index = e_pt_old2.index;
+                                        edge_new_2.pt1 = e_pt_old2.coord;
+                                        edge_new_2.pt2_index = e_pt_new_intersection.index;
+                                        edge_new_2.pt2 = e_pt_new_intersection.coord;
+
+                                        edge_new_3.pt1_index = e_pt_new_intersection.index;
+                                        edge_new_3.pt1 = e_pt_new_intersection.coord;
+                                        edge_new_3.pt2_index = e_new_pt2.index;
+                                        edge_new_3.pt2 = e_new_pt2.coord;
+
+                                        edges_tmp.push_back(edge_new_1);
+                                        edges_tmp.push_back(edge_new_2);
+                                        edges_tmp.push_back(edge_new_3);
+                                        
+                                        points.push_back(e_pt_new_intersection);
+                                        points.push_back(e_new_pt2);
+                                }
+                                else // 除了交点，需要增加两个点（新edge的两个点）, 交点替换原edge的其中一个点
+                                {
+                                        // 找到要替换的点
+                                        int e_pt_sub_index;
+                                        std::vector<int> e_pt_sub_adj;
+                                        for (size_t i = 0; i < points.size(); i++)
+                                        {
+                                                if (points[i].coord.first == pt_intersection.first)
+                                                {
+                                                        e_pt_sub_index = points[i].index;
+                                                        e_pt_sub_adj = points[i].adjacent_vec;
+                                                        break;
+                                                }
+                                        }
+                                        // 更新为原点的值,保持原来的相邻关系
+                                        e_pt_new_intersection.index = e_pt_sub_index;
+                                        e_pt_new_intersection.adjacent_vec = e_pt_sub_adj;
+
+                                        // 赋值新增加的两个点
+                                        EnhancedPoint e_pt_new1, e_pt_new2;
+                                        
+                                        e_pt_new1.coord = edge1.pt1;
+                                        e_pt_new1.visited = false;
+                                        e_pt_new1.index = index++;
+
+                                        e_pt_new2.coord = edge1.pt2;
+                                        e_pt_new2.visited = false;
+                                        e_pt_new2.index = index++;
+
+                                        // 添加 新点和交点的相邻关系
+                                        add_adjacent_relation(e_pt_new1, e_pt_new_intersection);
+                                        add_adjacent_relation(e_pt_new2, e_pt_new_intersection);
+
+                                        Edge edge_new_1, edge_new_2, edge_new_3;
+                                        edge_new_1.pt1_index = e_pt_new1.index;
+                                        edge_new_1.pt1 = e_pt_new1.coord;
+                                        edge_new_1.pt2_index = e_pt_new_intersection.index;
+                                        edge_new_1.pt2 = e_pt_new_intersection.coord;
+                                        
+                                        edge_new_2.pt1_index = e_pt_new2.index;
+                                        edge_new_2.pt1 = e_pt_new2.coord;
+                                        edge_new_2.pt2_index = e_pt_new_intersection.index;
+                                        edge_new_2.pt2 = e_pt_new_intersection.coord;
+
+                                        // 找到edge2中非相交的点。
+                                        edge_new_3.pt1_index = e_pt_new_intersection.index;
+                                        edge_new_3.pt1 = e_pt_new_intersection.coord;
+                                        if (pt_intersection == edge2.pt1)
+                                        {
+                                                edge_new_3.pt2_index = edge2.pt2_index;
+                                                edge_new_3.pt2 = edge2.pt2;
+                                        }
+                                        else
+                                        {
+                                                edge_new_3.pt2_index = edge2.pt1_index;
+                                                edge_new_3.pt1_index = edge2.pt1_index;
+                                        }
+
+                                        edges_tmp.push_back(edge_new_1);
+                                        edges_tmp.push_back(edge_new_2);
+                                        edges_tmp.push_back(edge_new_3);
+
+                                        // 替换原edge中的相交顶点
+                                        for (size_t i = 0; i < points.size(); i++)
+                                        {
+                                             if (points[i].coord == pt_intersection)
+                                             {
+                                                points[i] = e_pt_new_intersection;
+                                             }   
+                                        }
+
+                                        points.push_back(e_pt_new1);
+                                        points.push_back(e_pt_new2);
+                                }
 
                                 break;
                         }

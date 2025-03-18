@@ -10,14 +10,14 @@ namespace garage_utils_pkg
 class GenerateModel
 {
 public:
-        GenerateModel(std::vector<std::vector<Point>> rects, rclcpp::Node::SharedPtr node, double dis_thr);
+        GenerateModel(const std::vector<std::vector<Point>>& rects, rclcpp::Node::SharedPtr node, double dis_thr);
         ~GenerateModel();
 
         void check_rects(std::vector<std::vector<Point>> rects);
         void assert_(bool condition, std::string errors);
-        void print_rects(std::vector<std::vector<Point>> rects);
-        std::vector<EnhancedRect> rectify_rects(const std::vector<std::vector<Point>>& rects);
-        std::vector<EnhancedRect> init_rects(std::vector<std::vector<Point>> rects);
+        void print_rects(const std::vector<std::vector<Point>>& rects);
+        void print_enhanced_rects(const std::vector<EnhancedRect>& rects);
+        std::vector<EnhancedRect> init_rects(const std::vector<std::vector<Point>>& rects);
         void sortVertices(EnhancedRect& rect);
         void generate_middle_long_line(EnhancedRect& rect);
         std::vector<Edge> generate_edges(std::vector<EnhancedRect> rects);
@@ -39,12 +39,6 @@ public:
         // 删除两个点的相邻关系
         void remove_adjacent_relation(EnhancedPoint& pt1, EnhancedPoint& pt2);
 
-        // 添加edge
-        void add_edge(const Edge& edge);
-        // 删除edge
-        void remove_edge(const Edge& edge);
-
-
         // 找到某一个点在线段上离它最近的点  
         Point find_neareast_point(double px, double py, double seg1x, double seg1y, double seg2x, double seg2y);
 
@@ -58,6 +52,11 @@ public:
 
         void generate_points(std::vector<EnhancedPoint>& points, const std::vector<Edge>& edges, double dis_thr);
 
+        std::vector<EnhancedPoint> get_points()
+        {
+                return points_;
+        }
+
 private:
         double dis_thr_;
         std::vector<std::vector<Point>>    rects_;     // 输入
@@ -69,4 +68,5 @@ private:
 };
 
 } // end of namespace
+
 #endif
