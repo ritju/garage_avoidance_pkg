@@ -4,6 +4,8 @@
 #include "garage_utils/types.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include <algorithm>
+#include <queue>
+#include <unordered_map>
 
 namespace garage_utils_pkg
 {
@@ -54,18 +56,31 @@ public:
 
         void generate_points(std::vector<EnhancedPoint>& points, const std::vector<Edge>& edges, double dis_thr);
 
+        void sort_edges(std::vector<Edge>& edges);
+
         std::vector<EnhancedPoint> get_points()
         {
                 return points_;
         }
 
+        template<typename T>
+        const char* vector_to_string(const std::vector<T>& vec)
+        {
+                std::stringstream ss;
+                for (const auto& elem : vec)
+                {
+                        ss << elem << " ";
+                }
+                return ss.str().c_str();
+        }
+
 private:
-        double dis_thr_;
         std::vector<std::vector<Point>>    rects_;     // 输入
         std::vector<EnhancedRect>          rects_tmp_;
         std::vector<EnhancedPoint>         points_;    // 输出
         rclcpp::Node::SharedPtr            node_;
         int                                index;      // 生成points时的索引值。
+        double                             dis_thr_;
         
 };
 

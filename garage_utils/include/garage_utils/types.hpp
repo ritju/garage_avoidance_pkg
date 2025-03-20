@@ -31,6 +31,7 @@ namespace garage_utils_pkg
 
         struct Edge
         {
+                int index;
                 int pt1_index;
                 int pt2_index;
                 Point pt1;

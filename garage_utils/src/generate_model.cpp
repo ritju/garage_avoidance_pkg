@@ -11,10 +11,14 @@ namespace garage_utils_pkg
                 index = 0;
                 RCLCPP_INFO(node_->get_logger(), "GenerateModel constructor.");
                 RCLCPP_INFO(node_->get_logger(), "Check rects.");
+
                 check_rects(rects_);
+
                 RCLCPP_INFO(node_->get_logger(), "Print rects");
                 print_rects(rects_);
-                rects_tmp_ = init_rects(rects_);
+
+                rects_tmp_ = init_rects(rects_);  
+
                 RCLCPP_INFO(node_->get_logger(), "Begin to generate model.");
                 generate_model(rects_tmp_, this->dis_thr_); 
         }
@@ -235,6 +239,7 @@ namespace garage_utils_pkg
         {
                 index = 0;
                 auto edges = generate_edges(rects);
+                sort_edges(edges);
                 print_edges(edges);  
                 size_t edges_size = edges.size();
                 assert_(edges_size > 0, "edges's size shall > 0");
@@ -307,6 +312,26 @@ namespace garage_utils_pkg
                                         else
                                         {
                                                 RCLCPP_INFO(node_->get_logger(), "is neighbor: not satisfied");
+                                                if (j == edges_added.size() - 1)
+                                                {
+                                                        RCLCPP_INFO(node_->get_logger(), "all old edges are not neighbored with the new edge, just push new edge's two points into points vector");
+                                                        
+                                                        EnhancedPoint e_pt1, e_pt2;
+                           
+                                                        e_pt1.index = edge.pt1_index;
+                                                        e_pt1.visited = false;
+                                                        e_pt1.coord = edge.pt1;
+
+                                                        e_pt2.index = edge.pt2_index;
+                                                        e_pt2.visited = false;
+                                                        e_pt2.coord = edge.pt2;
+                                                        
+                                                        add_adjacent_relation(e_pt1, e_pt2);
+                                                        edges_added.push_back(edge);
+                                                        points.push_back(e_pt1);
+                                                        points.push_back(e_pt2);
+                                                        break; // 最后一个也不相交要break出来
+                                                }
                                                 continue;
                                         }
                                 }
@@ -339,28 +364,6 @@ namespace garage_utils_pkg
                                 RCLCPP_INFO(node_->get_logger(), "adjacent: %s", ss.str().c_str());
                                 RCLCPP_INFO(node_->get_logger(), "");
                         }
-                }
-
-                // 填充points
-                for (size_t i = 0; i < edges_added.size(); i++)
-                {
-                        EnhancedPoint e_pt1, e_pt2;
-                        Point pt1, pt2;
-                        pt1 = edges_added[i].pt1;
-                        pt2 = edges_added[i].pt2;
-
-                        e_pt1.coord = pt1;
-                        e_pt1.visited = false;
-                        // todo 
-                        // e_pt1.adjacent_vec = ;
-
-                        e_pt2.coord = pt2;
-                        e_pt2.visited = false;
-                        // todo 
-                        // e_pt2.adjacent_vec = ;
-
-                        points.push_back(e_pt1);
-                        points.push_back(e_pt2);
                 }
         }
 
@@ -876,6 +879,86 @@ namespace garage_utils_pkg
                 double nearest_y = seg1y + t * dy;
                 
                 return {nearest_x, nearest_y}; // 返回pair结构‌:
+        }
+
+        void GenerateModel::sort_edges(std::vector<Edge>& edges)
+        {
+                // 先初始化index、weight、adjacent
+                int index = 0;
+                for (auto & edge: edges)
+                {
+                        edge.index = index++;
+                }
+
+                // 获取edge的相邻关系
+                std::unordered_map<int, std::vector<int>> adj;
+                for (size_t i = 0; i < edges.size() - 1; i++)
+                {
+                        for (size_t j = i + 1;j < edges.size(); j++)
+                        {
+                                auto &edge1 = edges[i];
+                                auto &edge2 = edges[j];
+                                if (is_neighbor(edge1, edge2, this->dis_thr_))
+                                {
+                                        adj[i].push_back(j);
+                                        adj[j].push_back(i);
+                                }
+                        }
+                }
+
+                // 根据相邻关系，按BFS排序。
+                std::vector<int>order;
+                std::queue<int> q;
+                int root = 0; // 根节点
+
+                std::unordered_map<int, bool> visited;
+                std::unordered_map<int, int> parent;
+                for (size_t i = 0; i < edges.size(); i++)
+                {
+                        visited[i] = false;
+                }
+
+                //初始化根节点
+                q.push(root);
+                visited[root] = true;
+                parent[root] = -1;
+                order.push_back(root);
+
+                // BFS 遍历树结构
+                while(!q.empty())
+                {
+                        int u = q.front();
+                        q.pop();
+
+                        // 遍历相邻节点
+                        for (int v : adj.at(u))
+                        {
+                                if (!visited[v])
+                                {
+                                        visited[v] = true;
+                                        parent[v] = u; // 记录夫节点
+                                        order.push_back(v);
+                                        q.push(v);
+                                }
+                        }
+                }
+
+                RCLCPP_INFO(node_->get_logger(), "order =>  %s", vector_to_string(order));
+
+                const auto edges_clone = edges;
+                edges.clear();
+                for (size_t i = 0; i < order.size(); i++)
+                {
+                        auto order_number = order[i];
+                        for (size_t j = 0; j < edges_clone.size(); j++)
+                        {
+                                if (edges_clone[j].index == order_number)
+                                {
+                                        edges.push_back(edges_clone[j]);
+                                        break;
+                                }
+                        }
+                }
         }
         
 
