@@ -50,22 +50,34 @@ target_include_directories(generate_model PUBLIC
   $<INSTALL_INTERFACE:include>)
 ament_target_dependencies(generate_model ${dependencies})
 
+add_library(shortest_path_search SHARED
+  src/shortest_path_search.cpp)
+target_include_directories(shortest_path_search PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+ament_target_dependencies(shortest_path_search ${dependencies})
+
 add_executable(test_generate_model src/test_generate_model.cpp)
 target_include_directories(test_generate_model PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-target_link_libraries(test_generate_model generate_model)
+target_link_libraries(test_generate_model generate_model shortest_path_search)
 ament_target_dependencies(test_generate_model ${dependencies})
 
+add_executable(test_shortest_path_search src/test_shortest_path_search.cpp)
+target_include_directories(test_shortest_path_search PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_link_libraries(test_shortest_path_search shortest_path_search)
+ament_target_dependencies(test_shortest_path_search ${dependencies})
+
 install(TARGETS
-  compute_right_edge_path_server generate_model test_generate_model
+  compute_right_edge_path_server generate_model test_generate_model shortest_path_search test_shortest_path_search
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
 
-install(TARGETS test_generate_model
+install(TARGETS test_generate_model test_shortest_path_search
 DESTINATION lib/${PROJECT_NAME})
-
-ament_export_libraries(test_generate_model)
 
 ament_package()

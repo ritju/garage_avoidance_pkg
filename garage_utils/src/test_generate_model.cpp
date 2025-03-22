@@ -1,4 +1,5 @@
 #include "garage_utils/generate_model.hpp"
+#include "garage_utils/shortest_path_search.hpp"
 
 #include "algorithm"
 #include <random>
@@ -121,7 +122,8 @@ int main(int argc, char** argv)
                 //         RCLCPP_INFO(node->get_logger(), "%s", ss_permutation.str().c_str());
                 // }
 
-                for (size_t p_i = 0; p_i < permutations.size(); p_i++)
+                // for (size_t p_i = 0; p_i < permutations.size(); p_i++)
+                for (size_t p_i = 0; p_i < 1; p_i++)
                 {
                         std::stringstream ss_permutation;
                         ss_permutation << "index " << p_i << " => [ ";
@@ -187,6 +189,18 @@ int main(int argc, char** argv)
                                 }
                                 RCLCPP_INFO(node->get_logger(), "adjacent: [ %s]", ss.str().c_str());
                         }
+
+                        auto node2 = std::make_shared<rclcpp::Node>("test_shortest_path_search");
+                        auto path_searcher = new garage_utils_pkg::ShortestPathSearch(points, node2);
+        
+                        auto path = path_searcher->get_path();
+                        path_searcher->filter_path(points, path);
+                        std::stringstream ss;
+                        for (size_t i = 0; i < path.size(); i++)
+                        {
+                                ss << path[i] << " ";
+                        }
+                        RCLCPP_INFO(node->get_logger(), "filtered path : [ %s]", ss.str().c_str());
                 }                
         }
         catch(const std::string& e)
