@@ -98,6 +98,9 @@ namespace garage_utils_pkg
 
         void ShortestPathSearch::get_sub_path(const std::vector<EnhancedPoint>& points, const int& parent,  const int& current, double& distance, std::vector<int>& path)
         {
+                bool is_leaf = false;
+                std::stringstream ss_record_distance;
+                ss_record_distance << "(init: " << distance << ") => ";
                 // parent/current/child的数值 在points中对应的index是不同的
                 int index_parent, index_current, index_child;
                 index_parent = get_points_index(points, parent);
@@ -123,8 +126,10 @@ namespace garage_utils_pkg
                         double y_current = points[index_current].coord.second;
 
                         // 更新distance
-                        double distance_parent2child = std::hypot(x_current - x_parent, y_current - y_parent);
-                        distance += distance_parent2child;
+                        double distance_parent2current = std::hypot(x_current - x_parent, y_current - y_parent);
+                        ss_record_distance << "(" << distance << "+=" << distance_parent2current << "*2=" ;
+                        distance += distance_parent2current * 2;
+                        ss_record_distance << distance << ") => ";
                 }
 
                 // 2、更新path: 添加current到path
@@ -150,6 +155,7 @@ namespace garage_utils_pkg
                                 }
                                 else  // 这是一个叶节点
                                 {
+                                        is_leaf = true;
                                         RCLCPP_INFO(node_->get_logger(), "leaf: %d", current);
                                         int child = points[index_current].adjacent_vec[0];
                                         index_child = get_points_index(points, child);
@@ -186,8 +192,12 @@ namespace garage_utils_pkg
                       pq_child = pq.top();
 
                       double dis_child = pq_child.first;
-                      distance += dis_child;
-
+                      if (!is_leaf)
+                      {
+                        ss_record_distance << "(" << distance << "+=" << dis_child << "=" ;
+                        distance += dis_child;
+                        ss_record_distance << distance << ") => ";
+                      }
                       std::vector<int> path_sub = pq_child.second;
 
                       for (int index : path_sub)
@@ -203,7 +213,9 @@ namespace garage_utils_pkg
                 {
                         ss << path[i] << " ";
                 }
-                RCLCPP_INFO(node_->get_logger(), "distance: %f", distance);
+                RCLCPP_INFO(node_->get_logger(), "*** get_sub_path(%d, %d) ***", parent, current);
+                RCLCPP_INFO(node_->get_logger(), "distance record: %s", ss_record_distance.str().c_str());
+                RCLCPP_INFO(node_->get_logger(), "distance: %.3f", distance);
                 RCLCPP_INFO(node_->get_logger(), "path    : [ %s]", ss.str().c_str());
         }
 
