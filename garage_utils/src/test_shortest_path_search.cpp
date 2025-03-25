@@ -58,17 +58,29 @@ int main(int argc, char** argv)
                 e_points.push_back(e_point);
         }
 
-        auto path_searcher = new garage_utils_pkg::ShortestPathSearch(e_points, node);
-        
-        auto path = path_searcher->get_path();
-        path_searcher->filter_path(e_points, path);
-
-        std::stringstream ss;
-        for (size_t i = 0; i < path.size(); i++)
+        try
         {
-                ss << path[i] << " ";
+                auto path_searcher = new garage_utils_pkg::ShortestPathSearch(node);
+                path_searcher->process_(e_points);
+                
+                auto path = path_searcher->get_path();
+                path_searcher->filter_path(e_points, path);
+                
+                std::stringstream ss;
+                for (size_t i = 0; i < path.size(); i++)
+                {
+                        ss << path[i] << " ";
+                }
+                RCLCPP_INFO(node->get_logger(), "path => %s", ss.str().c_str());
         }
-        RCLCPP_INFO(node->get_logger(), "path => %s", ss.str().c_str());
+        catch(const std::string & e)
+        {
+                std::cerr << e.c_str() << '\n';
+        }
+        catch (const std::exception & e)
+        {
+                std::cerr << e.what() << "\n";
+        }
 
         rclcpp::shutdown();
 }

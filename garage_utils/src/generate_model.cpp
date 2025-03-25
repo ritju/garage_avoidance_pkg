@@ -3,13 +3,22 @@
 
 namespace garage_utils_pkg
 {
-        GenerateModel::GenerateModel(const std::vector<std::vector<Point>>& rects, rclcpp::Node::SharedPtr node, double dis_thr)
+        GenerateModel::GenerateModel(rclcpp::Node::SharedPtr node)
+        {
+                this->node_ = node;
+                RCLCPP_INFO(node_->get_logger(), "GenerateModel constructor.");
+        }
+
+        GenerateModel::~GenerateModel()
+        {
+                RCLCPP_INFO(node_->get_logger(), "GenerateModel destructor.");
+        }
+
+        void GenerateModel::process_(const std::vector<std::vector<Point>>& rects, double dis_thr)
         {
                 this->rects_ = rects;
-                this->node_ = node;
                 this->dis_thr_ = dis_thr;
                 index = 0;
-                RCLCPP_INFO(node_->get_logger(), "GenerateModel constructor.");
                 RCLCPP_INFO(node_->get_logger(), "Check rects.");
 
                 check_rects(rects_);
@@ -21,20 +30,7 @@ namespace garage_utils_pkg
 
                 RCLCPP_INFO(node_->get_logger(), "Begin to generate model.");
                 generate_model(rects_tmp_, this->dis_thr_); 
-        }
-
-        GenerateModel::~GenerateModel()
-        {
-
-        }
-
-        void GenerateModel::assert_(bool condition, std::string error_msg)
-        {
-                if (!condition)
-                {
-                        throw error_msg;
-                }
-        }
+        }      
 
         void GenerateModel::check_rects(std::vector<std::vector<Point>> rects)
         {

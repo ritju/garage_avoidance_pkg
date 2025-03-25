@@ -3,10 +3,12 @@
 
 #include <vector>
 #include <cstdio>
+#include <string>
 
 namespace garage_utils_pkg
 {
-        #define Point std::pair<double, double>
+        // #define Point std::pair<double, double> // 加上#include "nav_msgs/msg/path.hpp"后编译报错a template-id may not appear in a using-declaration
+        typedef std::pair<double, double> Point;  // 或 using Point = std::pair<double, double>;
 
         struct EnhancedPoint
         {
@@ -57,6 +59,16 @@ namespace garage_utils_pkg
         size_t index;                                             // 矩形索引值，用于调试矩形排序结果
         std::vector<std::pair<double, double>> middle_long_line;  // 矩形两条长边决定的遍历过程要覆盖的路径
         };
+
+        void assert_(bool condition, std::string error_msg)
+        {
+                if (!condition)
+                {
+                        throw error_msg;
+                }
+        }
+
+
 } // end of namespace
 
 #endif

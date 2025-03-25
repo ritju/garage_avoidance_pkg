@@ -13,11 +13,12 @@ namespace garage_utils_pkg
 class GenerateModel
 {
 public:
-        GenerateModel(const std::vector<std::vector<Point>>& rects, rclcpp::Node::SharedPtr node, double dis_thr);
+        GenerateModel(rclcpp::Node::SharedPtr node);
         ~GenerateModel();
 
+        void process_(const std::vector<std::vector<Point>>& rects, double dis_thr);
+
         void check_rects(std::vector<std::vector<Point>> rects);
-        void assert_(bool condition, std::string errors);
         void print_rects(const std::vector<std::vector<Point>>& rects);
         void print_enhanced_rects(const std::vector<EnhancedRect>& rects);
         void print_edges(const std::vector<Edge> edges);

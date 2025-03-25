@@ -13,13 +13,10 @@ namespace garage_utils_pkg
         class ShortestPathSearch
         {
         public:
-                explicit ShortestPathSearch(const std::vector<EnhancedPoint>& points, rclcpp::Node::SharedPtr node);
-                ShortestPathSearch()
-                {
-                        // RCLCPP_INFO(node_->get_logger(), "ShortestPathSearch constructor."); 
-                        printf("123]\n");   
-                }
+                explicit ShortestPathSearch(rclcpp::Node::SharedPtr node);
                 ~ShortestPathSearch();
+
+                void process_(const std::vector<EnhancedPoint>& points);
 
                 std::vector<int> generate_path1(const std::vector<EnhancedPoint>& points); // dijstra算法
                 std::vector<int> generate_path2(const std::vector<EnhancedPoint>& points); // dfs算法

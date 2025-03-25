@@ -33,16 +33,6 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-add_library(compute_right_edge_path_server SHARED
-  src/compute_right_edge_path.cpp)
-target_include_directories(compute_right_edge_path_server PRIVATE
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-ament_target_dependencies(compute_right_edge_path_server ${dependencies})
-rclcpp_components_register_node(
-  compute_right_edge_path_server PLUGIN "garage_utils_pkg::ComputeRightEdgePathActionServer" 
-  EXECUTABLE compute_right_edge_path_server_node)
-
 add_library(generate_model SHARED
   src/generate_model.cpp)
 target_include_directories(generate_model PUBLIC
@@ -56,6 +46,23 @@ target_include_directories(shortest_path_search PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 ament_target_dependencies(shortest_path_search ${dependencies})
+
+add_library(generate_path SHARED
+  src/generate_path.cpp)
+target_include_directories(generate_path PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+ament_target_dependencies(generate_path ${dependencies})
+
+add_library(compute_right_edge_path_server SHARED src/compute_right_edge_path.cpp)
+target_include_directories(compute_right_edge_path_server PRIVATE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+ament_target_dependencies(compute_right_edge_path_server ${dependencies})
+target_link_libraries(compute_right_edge_path_server generate_model shortest_path_search generate_path)
+rclcpp_components_register_node(
+  compute_right_edge_path_server PLUGIN "garage_utils_pkg::ComputeRightEdgePathActionServer" 
+  EXECUTABLE compute_right_edge_path_server_node)
 
 add_executable(test_generate_model src/test_generate_model.cpp)
 target_include_directories(test_generate_model PUBLIC
@@ -71,13 +78,20 @@ target_include_directories(test_shortest_path_search PUBLIC
 target_link_libraries(test_shortest_path_search shortest_path_search)
 ament_target_dependencies(test_shortest_path_search ${dependencies})
 
+add_executable(test_generate_path src/test_generate_path.cpp)
+target_include_directories(test_generate_path PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_link_libraries(test_generate_path generate_path shortest_path_search)
+ament_target_dependencies(test_generate_path ${dependencies})
+
 install(TARGETS
-  compute_right_edge_path_server generate_model test_generate_model shortest_path_search test_shortest_path_search
+  compute_right_edge_path_server generate_model test_generate_model shortest_path_search test_shortest_path_search generate_path test_generate_path
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
 
-install(TARGETS test_generate_model test_shortest_path_search
+install(TARGETS test_generate_model test_shortest_path_search test_generate_path
 DESTINATION lib/${PROJECT_NAME})
 
 ament_package()

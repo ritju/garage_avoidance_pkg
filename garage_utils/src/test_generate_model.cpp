@@ -142,13 +142,13 @@ int main(int argc, char** argv)
                         ss_permutation << "]";
                         RCLCPP_INFO(node->get_logger(), "current permutation: %s", ss_permutation.str().c_str());
                         
-                        std::vector<std::vector<Point>> rects;
+                        std::vector<std::vector<garage_utils_pkg::Point>> rects;
                         for (int i = 0; i < number; i++)
                         {
-                                std::vector<Point> p_v;
+                                std::vector<garage_utils_pkg::Point> p_v;
                                 for (int j = 0; j < 4; j++)
                                 {
-                                        Point pt;
+                                        garage_utils_pkg::Point pt;
                                         // pt.first = rects_[i][j][0];
                                         // pt.second = rects_[i][j][1];
                                         pt.first = rects_[permutations[p_i][i]][j][0];
@@ -160,7 +160,8 @@ int main(int argc, char** argv)
 
                         // RCLCPP_INFO(node->get_logger(), "rects size: %zd", rects.size());
                         
-                        auto model_generator = new garage_utils_pkg::GenerateModel(rects, node, dis_thr);
+                        auto model_generator = new garage_utils_pkg::GenerateModel(node);
+                        model_generator->process_(rects, dis_thr);
                         auto points = model_generator->get_points();
 
                         
@@ -191,7 +192,8 @@ int main(int argc, char** argv)
                         }
 
                         auto node2 = std::make_shared<rclcpp::Node>("test_shortest_path_search");
-                        auto path_searcher = new garage_utils_pkg::ShortestPathSearch(points, node2);
+                        auto path_searcher = new garage_utils_pkg::ShortestPathSearch(node2);
+                        path_searcher->process_(points);
         
                         auto path = path_searcher->get_path();
                         path_searcher->filter_path(points, path);

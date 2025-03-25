@@ -2,11 +2,20 @@
 
 namespace garage_utils_pkg
 {
-        ShortestPathSearch::ShortestPathSearch(const std::vector<EnhancedPoint>& points, rclcpp::Node::SharedPtr node)
+        ShortestPathSearch::ShortestPathSearch(rclcpp::Node::SharedPtr node)
+        {
+                this->node_ = node;
+                RCLCPP_INFO(node_->get_logger(), "ShortestPathSearch constructor."); 
+        }
+
+        ShortestPathSearch::~ShortestPathSearch()
+        {
+             RCLCPP_INFO(node_->get_logger(), "ShortestPathSearch destructor.");   
+        }
+
+        void ShortestPathSearch::process_(const std::vector<EnhancedPoint>& points)
         {
                 this->points_ = points;
-                this->node_ = node;
-                RCLCPP_INFO(node_->get_logger(), "ShortestPathSearch constructor.");
 
                 // 初始化节点遍历的掩码
                 this->mask_ = 0;
@@ -16,11 +25,6 @@ namespace garage_utils_pkg
                 this->path_.clear();
 
                 get_sub_path(this->points_, -1, 0, distance_, path_);
-        }
-
-        ShortestPathSearch::~ShortestPathSearch()
-        {
-             RCLCPP_INFO(node_->get_logger(), "ShortestPathSearch destructor.");   
         }
 
         std::vector<int> ShortestPathSearch::generate_path1(const std::vector<EnhancedPoint>& points)
