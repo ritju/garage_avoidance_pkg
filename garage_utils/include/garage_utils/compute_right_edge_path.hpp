@@ -24,6 +24,7 @@
 #include "garage_utils/types.hpp"
 #include "garage_utils/generate_model.hpp"
 #include "garage_utils/shortest_path_search.hpp"
+#include "garage_utils/generate_path.hpp"
 
 namespace garage_utils_pkg
 {
@@ -42,6 +43,9 @@ public:
   
     // 检查goal的合法性
     bool goal_checker(std::shared_ptr<const ComputeRightEdgePath::Goal> goal, std::string& reason);
+
+    void print_polygons(const std::vector<geometry_msgs::msg::Polygon> polygons);
+    void print_rect(const EnhancedRect& rect);
 
     rclcpp_action::GoalResponse handle_goal(
     const rclcpp_action::GoalUUID & uuid,
@@ -184,6 +188,8 @@ private:
   rclcpp_action::Server<ComputeRightEdgePath>::SharedPtr action_server_;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
 
+  nav_msgs::msg::Path path_;
+
   std::vector<geometry_msgs::msg::Polygon> polygons_;
   geometry_msgs::msg::PoseStamped car_pose_;
 
@@ -194,11 +200,13 @@ private:
 
   GenerateModel * model_generator_;
   ShortestPathSearch * path_searcher_;
+  GeneratePath * path_generator_;
 
   std::vector<EnhancedRect> rects_origin;
   std::vector<EnhancedRect> rects_ordered;
 
   // params
+  std::string path_topic_name_;
   double dis_thr_;
   
 

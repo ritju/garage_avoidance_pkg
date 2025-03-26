@@ -1,0 +1,4 @@
+compute_right_edge_path_action_server:
+  ros__parameters:
+    path_topic_name: "garage_path"
+    dis_thr: 2.5

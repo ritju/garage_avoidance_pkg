@@ -45,7 +45,12 @@ namespace garage_utils_pkg
                         {
                                 for (size_t k = j+1; k < rect.size(); k++)
                                 {
-                                        assert_(rect[j] != rect[k], "the 4 points of rect shall be different.");
+                                        std::stringstream ss;
+                                        ss << "the 4 points of rect shall be different. but rect " << i << " has same points. "
+                                           << "(" << rect[j].first << ", " << rect[j].second << ") and "
+                                           << "(" << rect[k].first << ", " << rect[k].second << ")";
+
+                                        assert_(rect[j] != rect[k], ss.str());
                                 }
                         }
                 }

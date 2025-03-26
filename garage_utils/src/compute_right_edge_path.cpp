@@ -5,24 +5,21 @@ namespace garage_utils_pkg
         ComputeRightEdgePathActionServer::ComputeRightEdgePathActionServer(const rclcpp::NodeOptions & options)
                 : Node("compute_right_edge_path_action_server", options)
         {
+                RCLCPP_INFO(get_logger(), "compute_right_edge_path_action_server constructor.");
                 using namespace std::placeholders;
 
                 init_params();
 
                 // init tf2
                 this->tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
-                this->tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*this->tf_buffer_);
-
-                auto node_ptr = shared_from_this();
-                this->model_generator_ = new GenerateModel(node_ptr);
-                this->path_searcher_ = new ShortestPathSearch(node_ptr);
-
+                this->tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*this->tf_buffer_);                
+                
                 std::vector<geometry_msgs::msg::Polygon>().swap(polygons_);
 
                 auto callback_group = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
                 auto pub_ops = rclcpp::PublisherOptions();
                 pub_ops.callback_group = callback_group;
-                path_pub_ = this->create_publisher<nav_msgs::msg::Path>("path_right_edge", rclcpp::QoS{1}.best_effort(), pub_ops);
+                path_pub_ = this->create_publisher<nav_msgs::msg::Path>(this->path_topic_name_, rclcpp::QoS{1}.reliable(), pub_ops);
 
                 this->action_server_ = rclcpp_action::create_server<ComputeRightEdgePath>(
                 this,
@@ -40,29 +37,27 @@ namespace garage_utils_pkg
 
         void ComputeRightEdgePathActionServer::init_params()
         {
+                this->declare_parameter<std::string>("path_topic_name", "garage_path");
                 this->declare_parameter<double>("dis_thr", 2.5);
 
                 this->dis_thr_ = this->get_parameter_or("dis_thr", 2.5);
+                this->path_topic_name_ = this->get_parameter_or("path_topic_name", std::string("garage_path"));
+
+                RCLCPP_DEBUG(get_logger(), "------------ list params ------------ ");
+                RCLCPP_DEBUG(get_logger(), "dist_thr: %f", this->dis_thr_);
+                RCLCPP_DEBUG(get_logger(), "path_topic_name: %s", this->path_topic_name_.c_str());
         }
 
-        rclcpp_action::GoalResponse ComputeRightEdgePathActionServer::handle_goal(const rclcpp_action::GoalUUID & uuid,std::shared_ptr<const ComputeRightEdgePath::Goal> goal)
+        void ComputeRightEdgePathActionServer::print_polygons(const std::vector<geometry_msgs::msg::Polygon> polygons)
         {
-                (void)uuid;
-
-                RCLCPP_INFO(this->get_logger(), "Received goal request with %ld polygons, the pose of car (%f, %f).", 
-                        goal->polygons.size(), goal->car_pose.pose.position.x, goal->car_pose.pose.position.y);
-                
-                // 打印 goal里的polygons
-                geometry_msgs::msg::Polygon polygon;
-                geometry_msgs::msg::Point32 point;
-                for (size_t i = 0; i < goal->polygons.size(); i++)
+                for (size_t i = 0; i < polygons.size(); i++)
                 {
                         std::stringstream ss;
                         ss << "[";
-                        polygon = goal->polygons[i];
+                        geometry_msgs::msg::Polygon polygon = polygons[i];
                         for (size_t j = 0; j < polygon.points.size(); j++)
                         {
-                                point = polygon.points[j];
+                                geometry_msgs::msg::Point32 point = polygon.points[j];
                                 ss << "(" <<  point.x << ", " << point.y << ")";
                                 if (j != (polygon.points.size() - 1))
                                 {
@@ -72,10 +67,43 @@ namespace garage_utils_pkg
                         ss << "]";
                         RCLCPP_INFO(get_logger(), "polygon %zd: %s", i, ss.str().c_str());
                 }
+        }
+
+        void ComputeRightEdgePathActionServer::print_rect(const EnhancedRect& rect)
+        {
+                auto vertices = rect.vertices;
+                for (size_t i = 0; i < vertices.size(); i++)
+                {
+                        RCLCPP_INFO(get_logger(), "vertices %zd: (%f, %f, %f)", i, vertices[i].x, vertices[i].y, vertices[i].angle);
+                }
+                RCLCPP_INFO(get_logger(), "middle_long_line: (%f, %f), (%f, %f)", 
+                        rect.middle_long_line[0].first, rect.middle_long_line[0].second,
+                        rect.middle_long_line[1].first, rect.middle_long_line[1].second);
+        }
+
+        rclcpp_action::GoalResponse ComputeRightEdgePathActionServer::handle_goal(const rclcpp_action::GoalUUID & uuid,std::shared_ptr<const ComputeRightEdgePath::Goal> goal)
+        {
+                (void)uuid;
+
+                if (!this->model_generator_)
+                {
+                        RCLCPP_INFO(get_logger(), "init [ model_generator_, path_searcher_, path_generator_ ] .");
+                        auto node_ptr = shared_from_this();
+                        this->model_generator_ = new GenerateModel(node_ptr);
+                        this->path_searcher_ = new ShortestPathSearch(node_ptr);
+                        this->path_generator_ = new GeneratePath(node_ptr);
+                }
+
+                RCLCPP_INFO(this->get_logger(), "Received goal request with %ld polygons, the pose of car (%f, %f).", 
+                        goal->polygons.size(), goal->car_pose.pose.position.x, goal->car_pose.pose.position.y);
 
                 // 保存car_pose和polygons
                 this->car_pose_ = goal->car_pose;
                 this->polygons_ = goal->polygons;
+
+                // 打印 goal里的polygons
+                RCLCPP_INFO(get_logger(), "print polygons in origin goal.");
+                print_polygons(polygons_);
 
                 return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;                
         }
@@ -97,188 +125,265 @@ namespace garage_utils_pkg
 
         void ComputeRightEdgePathActionServer::execute(const std::shared_ptr<GoalHandleComputeRightEdgePath> goal_handle)
         {
-                std::string reason;
-                if (!goal_checker(goal_handle->get_goal(), reason))
+                // define result
+                auto result = std::make_shared<garage_utils_msgs::action::ComputeRightEdgePath::Result>();
+
+                try
                 {
-                        RCLCPP_INFO(this->get_logger(), "reject the goal, for reason: %s", reason.c_str());
-                        auto result = std::make_shared<ComputeRightEdgePath::Result>();
-                        result->reason = reason;
-                        result->success = false;
-                        goal_handle->abort(result);
-                        return;
-                }
-                
-                RCLCPP_INFO(get_logger(), "Begin to compute path following right edge.");
-                const auto goal = goal_handle->get_goal();
-                auto feedback = std::make_shared<ComputeRightEdgePath::Feedback>();
-
-                while(!get_map_robot_tf())
-                {
-                        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000, "Waiting for get tf of robot in map.");
-                        sleep(0.2);
-                }
-
-                double robot_x, robot_y, car_x, car_y;
-                robot_x = map_robot_tf.getOrigin().getX();
-                robot_y = map_robot_tf.getOrigin().getY();
-                car_x = goal->car_pose.pose.position.x;
-                car_y = goal->car_pose.pose.position.y;
-
-                size_t current_index = get_current_polygon_index(map_robot_tf, polygons_);
-                auto polygon_first = this->polygons_[current_index];                
-                this->polygons_.erase(polygons_.begin() + current_index);
-
-                // 找到起点边框的middle_long_line
-                EnhancedRect enhanced_rect;
-                for (size_t j = 0; j < polygon_first.points.size(); j++)
-                {
-                        Vertex vertex;
-                        vertex.x = polygon_first.points[j].x;
-                        vertex.y = polygon_first.points[j].y;
-                        enhanced_rect.vertices.push_back(vertex);
-                }
-                model_generator_->sortVertices(enhanced_rect);
-                model_generator_->generate_middle_long_line(enhanced_rect);
-
-                // 对起点边框进行切割
-                // 找到两条长边框(和middle_long_line的夹角最小的两条边)
-                std::vector<std::pair<Point, Point>> edges;
-                for (size_t i = 0; i < enhanced_rect.vertices.size(); i++)
-                {
-                        std::pair<Point, Point> edge;
-                        edge.first.first = enhanced_rect.vertices[i].x;
-                        edge.first.second = enhanced_rect.vertices[i].y;
-                        edge.second.first = enhanced_rect.vertices[ (i + 1) % 4].x;
-                        edge.second.second = enhanced_rect.vertices[(i + 1) % 4].y;
-                        edges.push_back(edge);
-                }
-                // 把edges按与middle_long_line的夹角按从小到大的顺序排序
-                std::sort(edges.begin(), edges.end(), 
-                        [enhanced_rect, this](std::pair<Point, Point>& edge1, std::pair<Point, Point>& edge2)
+                        // 检查goal的合法性
+                        std::string reason;
+                        if (!goal_checker(goal_handle->get_goal(), reason))
                         {
-                                return theta_between_two_edges(edge1.first, edge1.second,
-                                        enhanced_rect.middle_long_line[0], enhanced_rect.middle_long_line[1]) 
-                                        <
-                                        theta_between_two_edges(edge2.first, edge2.second,
-                                        enhanced_rect.middle_long_line[0], enhanced_rect.middle_long_line[1]) ;
-                        });
-                auto long_line1 = edges[0];
-                auto long_line2 = edges[1];
-                
-                // 选取原有的两个顶点
-                Point p1_selected, p2_selected;
-
-                double l1_x = long_line1.second.first - long_line1.first.first;
-                double l1_y = long_line1.second.second - long_line1.first.second;
-                double l2_x = long_line2.second.first - long_line2.first.first;
-                double l2_y = long_line2.second.second - long_line2.first.second;
-                double car_robot_x = robot_x - car_x;
-                double car_robot_y = robot_y - car_y;
-
-                if ((l1_x * car_robot_x + l1_y * car_robot_y) > 0)
-                {
-                        p1_selected = long_line1.second;
-                }
-                else
-                {
-                        p1_selected = long_line1.first;
-                }
-
-                if ((l2_x * car_robot_x + l2_y * car_robot_y) > 0)
-                {
-                        p2_selected = long_line2.second;
-                }
-                else
-                {
-                        p2_selected = long_line2.first;
-                }
-
-                // 找到切割的矩形的另外两个点
-                Point p3_selected, p4_selected;
-                p3_selected = find_neareast_point(robot_x, robot_y, long_line1.first.first, long_line1.first.second, long_line1.second.first, long_line1.second.second);
-                p4_selected = find_neareast_point(robot_x, robot_y, long_line2.first.first, long_line2.first.second, long_line2.second.first, long_line2.second.second);
-
-                // 更新 polygon_first
-                polygon_first.points.clear();
-                geometry_msgs::msg::Point32 pt32;
-                
-                pt32.x = p1_selected.first;
-                pt32.y = p1_selected.second;
-                polygon_first.points.push_back(pt32);
-                
-                pt32.x = p2_selected.first;
-                pt32.y = p2_selected.second;
-                polygon_first.points.push_back(pt32);
-                
-                pt32.x = p3_selected.first;
-                pt32.y = p3_selected.second;
-                polygon_first.points.push_back(pt32);
-                
-                pt32.x = p4_selected.first;
-                pt32.y = p4_selected.second;
-                polygon_first.points.push_back(pt32);
-
-                this->polygons_.emplace(this->polygons_.begin(), polygon_first);
-
-                // 1、generate model
-                std::vector<std::vector<Point>> rects;
-                for (size_t i = 0; i < this->polygons_.size(); i++)
-                {
-                        auto polygon = polygons_[i];
-                        std::vector<Point> rect;
-                        for (size_t j = 0; j < polygon.points.size(); j++)
-                        {
-                                Point point;
-                                point.first = polygon.points[i].x;
-                                point.second = polygon.points[i].y;
-                                rect.push_back(point);                                
+                                RCLCPP_INFO(this->get_logger(), "reject the goal, for reason: %s", reason.c_str());
+                                auto result = std::make_shared<ComputeRightEdgePath::Result>();
+                                result->reason = reason;
+                                result->success = false;
+                                goal_handle->abort(result);
+                                return;
                         }
-                        rects.push_back(rect);
-                }
+                        
+                        RCLCPP_INFO(get_logger(), "Begin to compute path following right edge.");
+                        const auto goal = goal_handle->get_goal();
+                        auto feedback = std::make_shared<ComputeRightEdgePath::Feedback>();
 
-                model_generator_->process_(rects, dis_thr_);
-                auto points = model_generator_->get_points();
+                        // 根据car和机器人的位置，截断其所在的polygon
+                        while(!get_map_robot_tf())
+                        {
+                                RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000, "Waiting for get tf of robot in map.");
+                                std::this_thread::sleep_for(std::chrono::duration<double>(0.2));
+                        }
 
-                // 打印 model中的points
-                RCLCPP_INFO(get_logger(), "print result");
-                RCLCPP_INFO(get_logger(), "points size: %zd", points.size());
-                for (size_t i = 0; i < points.size(); i++)
-                {
-                        auto point = points[i];
-                        RCLCPP_INFO(get_logger(), "---------- points %zd ----------", i);
-                        RCLCPP_INFO(get_logger(), "index: %d", point.index);
-                        RCLCPP_INFO(get_logger(), "visited: %s", point.visited?"true":"false");
-                        RCLCPP_INFO(get_logger(), "coord: (%f, %f)", point.coord.first, point.coord.second);
+                        double robot_x, robot_y, car_x, car_y;
+                        robot_x = map_robot_tf.getOrigin().getX();
+                        robot_y = map_robot_tf.getOrigin().getY();
+                        car_x = goal->car_pose.pose.position.x;
+                        car_y = goal->car_pose.pose.position.y;
+
+                        // tmp, !!!!!!!!!!!!!!! delete atfer test !!!!!!!!!!!!!!
+                        robot_x = 0.0;
+                        robot_y = 3.0;
+                        
+                        RCLCPP_INFO(get_logger(), "robot_pose: (%f, %f)", robot_x, robot_y);
+
+                        size_t current_index = get_current_polygon_index(map_robot_tf, polygons_);
+                        auto polygon_first = this->polygons_[current_index];                
+                        this->polygons_.erase(polygons_.begin() + current_index);
+
+                        // 找到起点边框的middle_long_line
+                        EnhancedRect enhanced_rect;
+                        for (size_t j = 0; j < polygon_first.points.size(); j++)
+                        {
+                                Vertex vertex;
+                                vertex.x = polygon_first.points[j].x;
+                                vertex.y = polygon_first.points[j].y;
+                                enhanced_rect.vertices.push_back(vertex);
+                        }
+                        model_generator_->sortVertices(enhanced_rect);
+                        model_generator_->generate_middle_long_line(enhanced_rect);
+
+                        RCLCPP_INFO(get_logger(), "print first enhanced rect info before cutting.");
+                        print_rect(enhanced_rect);
+
+                        // 对起点边框进行切割
+                        // 找到两条长边框(和middle_long_line的夹角最小的两条边)
+                        std::vector<std::pair<Point, Point>> edges;
+                        for (size_t i = 0; i < enhanced_rect.vertices.size(); i++)
+                        {
+                                std::pair<Point, Point> edge;
+                                edge.first.first = enhanced_rect.vertices[i].x;
+                                edge.first.second = enhanced_rect.vertices[i].y;
+                                edge.second.first = enhanced_rect.vertices[ (i + 1) % 4].x;
+                                edge.second.second = enhanced_rect.vertices[(i + 1) % 4].y;
+                                edges.push_back(edge);
+                        }
+                        // 把edges按与middle_long_line的夹角按从小到大的顺序排序
+                        std::sort(edges.begin(), edges.end(), 
+                                [enhanced_rect, this](std::pair<Point, Point>& edge1, std::pair<Point, Point>& edge2)
+                                {
+                                        return theta_between_two_edges(edge1.first, edge1.second,
+                                                enhanced_rect.middle_long_line[0], enhanced_rect.middle_long_line[1]) 
+                                                <
+                                                theta_between_two_edges(edge2.first, edge2.second,
+                                                enhanced_rect.middle_long_line[0], enhanced_rect.middle_long_line[1]) ;
+                                });
+                        auto long_line1 = edges[0];
+                        auto long_line2 = edges[1];
+                        
+                        // 选取原有的两个顶点
+                        Point p1_selected, p2_selected;
+
+                        double l1_x = long_line1.second.first - long_line1.first.first;
+                        double l1_y = long_line1.second.second - long_line1.first.second;
+                        double l2_x = long_line2.second.first - long_line2.first.first;
+                        double l2_y = long_line2.second.second - long_line2.first.second;
+                        double car_robot_x = robot_x - car_x;
+                        double car_robot_y = robot_y - car_y;
+
+                        double dot1, dot2;
+
+                        dot1 = l1_x * car_robot_x + l1_y * car_robot_y;
+                        if (dot1 > 0)
+                        {
+                                p1_selected = long_line1.second;
+                        }
+                        else
+                        {
+                                p1_selected = long_line1.first;
+                        }
+
+                        dot2 = l2_x * car_robot_x + l2_y * car_robot_y;
+                        if (dot2 > 0)
+                        {
+                                p2_selected = long_line2.second;
+                        }
+                        else
+                        {
+                                p2_selected = long_line2.first;
+                        }
+
+                        RCLCPP_INFO(get_logger(), "dot1: %f, dot2: %f", dot1, dot2);
+                        RCLCPP_INFO(get_logger(), "p1_selected: (%f, %f)", p1_selected.first, p1_selected.second);
+                        RCLCPP_INFO(get_logger(), "p2_selected: (%f, %f)", p2_selected.first, p2_selected.second);
+
+                        // 找到切割的矩形的另外两个点
+                        Point p3_selected, p4_selected;
+                        p3_selected = find_neareast_point(robot_x, robot_y, long_line1.first.first, long_line1.first.second, long_line1.second.first, long_line1.second.second);
+                        p4_selected = find_neareast_point(robot_x, robot_y, long_line2.first.first, long_line2.first.second, long_line2.second.first, long_line2.second.second);
+
+                        RCLCPP_INFO(get_logger(), "p3_selected: (%f, %f)", p3_selected.first, p3_selected.second);
+                        RCLCPP_INFO(get_logger(), "p4_selected: (%f, %f)", p4_selected.first, p4_selected.second);
+                        
+                        // 更新 polygon_first
+                        polygon_first.points.clear();
+                        geometry_msgs::msg::Point32 pt32;
+                        
+                        pt32.x = p1_selected.first;
+                        pt32.y = p1_selected.second;
+                        polygon_first.points.push_back(pt32);
+                        
+                        pt32.x = p2_selected.first;
+                        pt32.y = p2_selected.second;
+                        polygon_first.points.push_back(pt32);
+                        
+                        pt32.x = p3_selected.first;
+                        pt32.y = p3_selected.second;
+                        polygon_first.points.push_back(pt32);
+                        
+                        pt32.x = p4_selected.first;
+                        pt32.y = p4_selected.second;
+                        polygon_first.points.push_back(pt32);
+
+                        this->polygons_.emplace(this->polygons_.begin(), polygon_first);
+
+                        RCLCPP_INFO(get_logger(), "print polygons after cutting.");
+                        print_polygons(this->polygons_);
+
+                        // 1、generate model
+                        std::vector<std::vector<Point>> rects;
+                        for (size_t i = 0; i < this->polygons_.size(); i++)
+                        {
+                                auto polygon = polygons_[i];
+                                std::vector<Point> rect;
+                                for (size_t j = 0; j < polygon.points.size(); j++)
+                                {
+                                        Point point;
+                                        point.first = polygon.points[j].x;
+                                        point.second = polygon.points[j].y;
+                                        rect.push_back(point);                                
+                                }
+                                rects.push_back(rect);
+                        }
+
+                        model_generator_->print_rects(rects);
+                        model_generator_->process_(rects, dis_thr_);
+                        auto points = model_generator_->get_points();
+
+                        // 打印 model中的points
+                        RCLCPP_INFO(get_logger(), "print result");
+                        RCLCPP_INFO(get_logger(), "points size: %zd", points.size());
+                        for (size_t i = 0; i < points.size(); i++)
+                        {
+                                auto point = points[i];
+                                RCLCPP_INFO(get_logger(), "---------- points %zd ----------", i);
+                                RCLCPP_INFO(get_logger(), "index: %d", point.index);
+                                RCLCPP_INFO(get_logger(), "visited: %s", point.visited?"true":"false");
+                                RCLCPP_INFO(get_logger(), "coord: (%f, %f)", point.coord.first, point.coord.second);
+                                std::stringstream ss;
+                                // RCLCPP_INFO(node->get_logger(), "adjacent_vec size: %zd", point.adjacent_vec.size());
+                                for (size_t j = 0; j < point.adjacent_vec.size(); j++)
+                                {
+                                        ss << point.adjacent_vec[j] ;
+                                        if (j == point.adjacent_vec.size() - 1)
+                                        {
+                                                ss << " ";
+                                        }
+                                        else
+                                        {
+                                                ss << ", ";
+                                        }
+                                }
+                                RCLCPP_INFO(get_logger(), "adjacent: [ %s]", ss.str().c_str());
+                        }
+
+                        // 2、把points排序，生成路线
+                        path_searcher_->process_(points);
+
+                        auto path = path_searcher_->get_path();
+                        path_searcher_->filter_path(points, path);
                         std::stringstream ss;
-                        // RCLCPP_INFO(node->get_logger(), "adjacent_vec size: %zd", point.adjacent_vec.size());
-                        for (size_t j = 0; j < point.adjacent_vec.size(); j++)
+                        for (size_t i = 0; i < path.size(); i++)
                         {
-                                ss << point.adjacent_vec[j] ;
-                                if (j == point.adjacent_vec.size() - 1)
-                                {
-                                        ss << " ";
-                                }
-                                else
-                                {
-                                        ss << ", ";
-                                }
+                                ss << path[i] << " ";
                         }
-                        RCLCPP_INFO(get_logger(), "adjacent: [ %s]", ss.str().c_str());
+                        RCLCPP_INFO(get_logger(), "filtered path : [ %s]", ss.str().c_str());
+
+                        // 3、根据遍历的路径顺序，逐段生成path
+                        std::vector<garage_utils_pkg::EnhancedPoint> points_ordered;
+                        for(size_t i = 0; i < path.size(); i++)
+                        {
+                                garage_utils_pkg::EnhancedPoint e_point;
+                                for (size_t j = 0; j < points.size(); j++)
+                                {
+                                        if (points[j].index == path[i])
+                                        {
+                                                e_point = points[j];
+                                                RCLCPP_INFO(get_logger(), "order: %d", path[i]);
+                                                RCLCPP_INFO(get_logger(), "points => index: %d, coord: (%f, %f)",
+                                                        points[j].index, points[j].coord.first, points[j].coord.second);
+                                                points_ordered.push_back(e_point);
+                                                break;
+                                        }
+                                } 
+                        }     
+                        
+                        path_generator_->process_(points_ordered, this->polygons_);
+                        this->path_ = path_generator_->get_path();
+
+                        // 4、publish path
+                        this->path_pub_->publish(this->path_);                         
+                        
+                        if (rclcpp::ok())
+                        {
+                                result->success = true;
+                                result->path = this->path_;
+                                goal_handle->succeed(result);
+                                RCLCPP_INFO(get_logger(), "Goal succeed");
+                        }
                 }
-
-                // 2、把points排序，生成路线
-                path_searcher_->process_(points);
-
-                auto path = path_searcher_->get_path();
-                path_searcher_->filter_path(points, path);
-                std::stringstream ss;
-                for (size_t i = 0; i < path.size(); i++)
+                catch(const std::exception& e)
                 {
-                        ss << path[i] << " ";
+                        RCLCPP_ERROR(get_logger(), "catch std::exception: %s", e.what());
+                        result->success = false;
+                        result->reason = e.what();
+                        goal_handle->abort(result);
                 }
-                RCLCPP_INFO(get_logger(), "filtered path : [ %s]", ss.str().c_str());
-
-                // 根据遍历的路径顺序，逐段生成path
+                catch(const std::string& e)
+                {
+                        RCLCPP_INFO(get_logger(), "catch std::string exception: %s", e.c_str());
+                        result->success = false;
+                        result->reason = e;
+                        goal_handle->abort(result);
+                }                          
         }
 
         double ComputeRightEdgePathActionServer::theta_between_two_edges(Point seg1_pt1, Point seg1_pt2, Point seg2_pt1, Point seg2_pt2)

@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<!--
+  For instructions on using Groot and description of the following BehaviorTree nodes,
+  please refer to the groot_instructions.md and REAMDE.md respectively located in the
+  nav2_behavior_tree package.
+-->
+<root>
+  <TreeNodesModel>
+    <!-- ############################### ACTION NODES ################################# -->  
+
+    <Action ID="ComputeRightEdgePath">
+      <input_port name="goal">The goal to send</input_port>
+      <input_port name="server_name">Server name</input_port>
+      <input_port name="server_timeout">Server timeout</input_port>
+      <output_port name="path">Path created by ComputeRightEdgePath node</output_port>
+    </Action>
+  </TreeNodesModel>
+</root>

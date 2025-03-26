@@ -129,7 +129,7 @@ int main(int argc, char**argv)
                {
                         RCLCPP_INFO_THROTTLE(node->get_logger(),*(node->get_clock()), 1000, "time_elapsed: %f", time_elapse);
                         path_pub->publish(path);
-                        sleep(time_delta);
+                        std::this_thread::sleep_for(std::chrono::duration<double>(time_delta));
                         time_elapse += time_delta;
                }
         }
