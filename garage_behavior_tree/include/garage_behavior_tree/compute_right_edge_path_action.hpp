@@ -62,8 +62,9 @@ public:
   {
     return providedBasicPorts(
       {
-        BT::OutputPort<nav_msgs::msg::Path>("path", "Path created by ComputeRightEdgePath node"),
-        BT::InputPort<geometry_msgs::msg::PoseStamped>("goal", "rects list and the pose of car"),
+        BT::OutputPort<nav_msgs::msg::Path>("garage_path", "Path created by ComputeRightEdgePath node"),
+        BT::InputPort<geometry_msgs::msg::PoseStamped>("polygons", "rects list"),
+        BT::InputPort<geometry_msgs::msg::PoseStamped>("car_pose", "the pose of car"),
       });
   }
 };

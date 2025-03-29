@@ -1,0 +1,141 @@
+
+#include <vector>
+#include <string>
+#include <set>
+#include <memory>
+#include <limits>
+#include "garage_navigator/garage_vehicle_avoidance.hpp"
+
+namespace garage_utils_pkg
+{
+
+bool
+GarageVehicleAvoidanceNavigator::configure(
+  rclcpp_lifecycle::LifecycleNode::WeakPtr parent_node)
+{
+  start_time_ = rclcpp::Time(0);
+  auto node = parent_node.lock();
+
+  if (!node->has_parameter("polygons_blackboard_id")) {
+    node->declare_parameter("polygons_blackboard_id", std::string("polygons"));
+  }
+
+  polygons_blackboard_id_ = node->get_parameter("polygons_blackboard_id").as_string();
+
+  if (!node->has_parameter("car_pose_blackboard_id")) {
+    node->declare_parameter("car_pose_blackboard_id", std::string("car_pose"));
+  }
+
+  car_pose_blackboard_id_ = node->get_parameter("car_pose_blackboard_id").as_string();
+
+  if (!node->has_parameter("path_blackboard_id")) {
+    node->declare_parameter("path_blackboard_id", std::string("path"));
+  }
+
+  path_blackboard_id_ = node->get_parameter("path_blackboard_id").as_string();
+
+  return true;
+}
+
+std::string
+GarageVehicleAvoidanceNavigator::getDefaultBTFilepath(
+  rclcpp_lifecycle::LifecycleNode::WeakPtr parent_node)
+{
+  std::string default_bt_xml_filename;
+  auto node = parent_node.lock();
+
+  if (!node->has_parameter("default_nav_to_pose_bt_xml")) {
+    std::string pkg_share_dir =
+      ament_index_cpp::get_package_share_directory("garage_navigator");
+    node->declare_parameter<std::string>(
+      "default_nav_to_pose_bt_xml",
+      pkg_share_dir +
+      "/behavior_trees/garage.xml");
+  }
+
+  node->get_parameter("default_nav_to_pose_bt_xml", default_bt_xml_filename);
+
+  return default_bt_xml_filename;
+}
+
+bool
+GarageVehicleAvoidanceNavigator::cleanup()
+{
+  return true;
+}
+
+bool
+GarageVehicleAvoidanceNavigator::goalReceived(ActionT::Goal::ConstSharedPtr goal)
+{
+  auto bt_xml_filename = goal->behavior_tree;
+
+  if (!bt_action_server_->loadBehaviorTree(bt_xml_filename)) {
+    RCLCPP_ERROR(
+      logger_, "BT file not found: %s. Navigation canceled.",
+      bt_xml_filename.c_str());
+    return false;
+  }
+
+  initializeGoalPose(goal);
+
+  return true;
+}
+
+void
+GarageVehicleAvoidanceNavigator::goalCompleted(
+  typename ActionT::Result::SharedPtr /*result*/,
+  const nav2_behavior_tree::BtStatus /*final_bt_status*/)
+{
+}
+
+void
+GarageVehicleAvoidanceNavigator::onLoop()
+{
+  // action server feedback 
+  auto feedback_msg = std::make_shared<ActionT::Feedback>();
+  auto blackboard = bt_action_server_->getBlackboard();
+
+  bt_action_server_->publishFeedback(feedback_msg);
+}
+
+void
+GarageVehicleAvoidanceNavigator::onPreempt(ActionT::Goal::ConstSharedPtr goal)
+{
+  RCLCPP_INFO(logger_, "Received goal preemption request");
+
+  if (goal->behavior_tree == bt_action_server_->getCurrentBTFilename() ||
+    (goal->behavior_tree.empty() &&
+    bt_action_server_->getCurrentBTFilename() == bt_action_server_->getDefaultBTFilename()))
+  {
+    // if pending goal requests the same BT as the current goal, accept the pending goal
+    // if pending goal has an empty behavior_tree field, it requests the default BT file
+    // accept the pending goal if the current goal is running the default BT file
+    initializeGoalPose(bt_action_server_->acceptPendingGoal());
+  } else {
+    RCLCPP_WARN(
+      logger_,
+      "Preemption request was rejected since the requested BT XML file is not the same "
+      "as the one that the current goal is executing. Preemption with a new BT is invalid "
+      "since it would require cancellation of the previous goal instead of true preemption."
+      "\nCancel the current goal and send a new action request if you want to use a "
+      "different BT XML file. For now, continuing to track the last goal until completion.");
+    bt_action_server_->terminatePendingGoal();
+  }
+}
+
+void
+GarageVehicleAvoidanceNavigator::initializeGoalPose(ActionT::Goal::ConstSharedPtr goal)
+{
+  RCLCPP_INFO(
+    logger_, "Begin to execute garage_vehicle_avoidance program.");
+
+  // Reset state for new action feedback
+  start_time_ = clock_->now();
+  auto blackboard = bt_action_server_->getBlackboard();
+
+  // Update the polygons and car_pose on the blackboard
+  blackboard->set<std::vector<geometry_msgs::msg::Polygon>>(polygons_blackboard_id_, goal->polygons);
+  blackboard->set<geometry_msgs::msg::PoseStamped>(car_pose_blackboard_id_, goal->car_pose);
+}
+
+}  // namespace garage_utils_pkg
