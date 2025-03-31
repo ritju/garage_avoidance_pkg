@@ -68,6 +68,7 @@ public:
         BT::InputPort<std::vector<geometry_msgs::msg::Polygon>>("polygons", "rects list"),
         BT::InputPort<geometry_msgs::msg::PoseStamped>("car_pose", "the pose of car"),
         BT::OutputPort<uint8_t>("state", "behavior tree state"),
+        BT::OutputPort<std::vector<geometry_msgs::msg::PoseStamped>>("goals", "poses for through poses action"),
       });
   }
 };

@@ -366,6 +366,7 @@ namespace garage_utils_pkg
                         {
                                 result->success = true;
                                 result->path = this->path_;
+                                result->poses = this->path_.poses;
                                 goal_handle->succeed(result);
                                 RCLCPP_INFO(get_logger(), "Goal succeed");
                         }

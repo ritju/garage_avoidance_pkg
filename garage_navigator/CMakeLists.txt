@@ -12,6 +12,7 @@ find_package(behaviortree_cpp_v3 REQUIRED)
 find_package(nav2_util REQUIRED)
 find_package(nav2_core REQUIRED)
 find_package(nav2_behavior_tree REQUIRED)
+find_package(garage_behavior_tree REQUIRED)
 
 find_package(garage_utils_msgs REQUIRED)
 
@@ -41,6 +42,7 @@ set(dependencies
   nav2_core
   garage_utils_msgs
   nav2_behavior_tree
+  garage_behavior_tree
 )
 
 add_library(${library_name} SHARED

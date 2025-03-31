@@ -74,6 +74,7 @@ void ComputeRightEdgePathAction::on_tick()
 BT::NodeStatus ComputeRightEdgePathAction::on_success()
 {
   setOutput("garage_path", result_.result->path);
+  setOutput("goals", result_.result->poses);
   // RCLCPP_INFO(node_->get_logger(), "path size: %zd", result_.result->path.poses.size());
   return BT::NodeStatus::SUCCESS;
 }
@@ -82,6 +83,8 @@ BT::NodeStatus ComputeRightEdgePathAction::on_aborted()
 {
   nav_msgs::msg::Path empty_path;
   setOutput("garage_path", empty_path);
+  std::vector<geometry_msgs::msg::PoseStamped> empty_poses;
+  setOutput("goals", empty_poses);
   return BT::NodeStatus::FAILURE;
 }
 
@@ -89,6 +92,8 @@ BT::NodeStatus ComputeRightEdgePathAction::on_cancelled()
 {
   nav_msgs::msg::Path empty_path;
   setOutput("garage_path", empty_path);
+  std::vector<geometry_msgs::msg::PoseStamped> empty_poses;
+  setOutput("goals", empty_poses);
   return BT::NodeStatus::SUCCESS;
 }
 
@@ -96,6 +101,8 @@ void ComputeRightEdgePathAction::halt()
 {
   nav_msgs::msg::Path empty_path;
   setOutput("garage_path", empty_path);
+  std::vector<geometry_msgs::msg::PoseStamped> empty_poses;
+  setOutput("goals", empty_poses);
   BtActionNode::halt();
 }
 

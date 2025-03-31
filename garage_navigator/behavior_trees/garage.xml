@@ -1,5 +1,5 @@
 <root main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
-        <ComputeRightEdgePath polygons="{polygons}" car_pose="{car_pose}" garage_path="{garage_path}" state="{state}" />
+        <ComputeRightEdgePath polygons="{polygons}" car_pose="{car_pose}" garage_path="{garage_path}" goals="{goals}" state="{state}" />
   </BehaviorTree>
 </root>

@@ -189,6 +189,7 @@ private:
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
 
   nav_msgs::msg::Path path_;
+  std::vector<geometry_msgs::msg::PoseStamped> poses_;
 
   std::vector<geometry_msgs::msg::Polygon> polygons_;
   geometry_msgs::msg::PoseStamped car_pose_;
