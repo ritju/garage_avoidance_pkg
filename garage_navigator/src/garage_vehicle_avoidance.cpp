@@ -19,20 +19,22 @@ GarageVehicleAvoidanceNavigator::configure(
   if (!node->has_parameter("polygons_blackboard_id")) {
     node->declare_parameter("polygons_blackboard_id", std::string("polygons"));
   }
-
   polygons_blackboard_id_ = node->get_parameter("polygons_blackboard_id").as_string();
 
   if (!node->has_parameter("car_pose_blackboard_id")) {
     node->declare_parameter("car_pose_blackboard_id", std::string("car_pose"));
   }
-
   car_pose_blackboard_id_ = node->get_parameter("car_pose_blackboard_id").as_string();
 
   if (!node->has_parameter("path_blackboard_id")) {
-    node->declare_parameter("path_blackboard_id", std::string("path"));
+    node->declare_parameter("path_blackboard_id", std::string("garage_path"));
   }
-
   path_blackboard_id_ = node->get_parameter("path_blackboard_id").as_string();
+
+  if (!node->has_parameter("state_id")) {
+    node->declare_parameter("state_id", std::string("state"));
+  }
+  state_id_ = node->get_parameter("state_id").as_string();
 
   return true;
 }
@@ -83,9 +85,25 @@ GarageVehicleAvoidanceNavigator::goalReceived(ActionT::Goal::ConstSharedPtr goal
 
 void
 GarageVehicleAvoidanceNavigator::goalCompleted(
-  typename ActionT::Result::SharedPtr /*result*/,
-  const nav2_behavior_tree::BtStatus /*final_bt_status*/)
+  typename ActionT::Result::SharedPtr result,
+  const nav2_behavior_tree::BtStatus final_bt_status)
 {
+  RCLCPP_INFO(logger_, "goalCompleted callback");
+  switch (final_bt_status)
+  {
+    case nav2_behavior_tree::BtStatus::SUCCEEDED:
+      result->success = true;
+      result->reason = "goal completed.";
+      break;
+    case nav2_behavior_tree::BtStatus::FAILED:
+      result->success = false;
+      result->reason = "failed";
+      break;
+    case nav2_behavior_tree::BtStatus::CANCELED:
+      result->success = false;
+      result->reason = "canceled";
+      break;
+  }
 }
 
 void
@@ -94,6 +112,11 @@ GarageVehicleAvoidanceNavigator::onLoop()
   // action server feedback 
   auto feedback_msg = std::make_shared<ActionT::Feedback>();
   auto blackboard = bt_action_server_->getBlackboard();
+
+  uint8_t state_number = 88;  
+  blackboard->get<uint8_t>(state_id_, state_number);
+  // RCLCPP_INFO(logger_, "get state: %d", state_number);
+  feedback_msg->state = state_number;
 
   bt_action_server_->publishFeedback(feedback_msg);
 }
@@ -133,9 +156,12 @@ GarageVehicleAvoidanceNavigator::initializeGoalPose(ActionT::Goal::ConstSharedPt
   start_time_ = clock_->now();
   auto blackboard = bt_action_server_->getBlackboard();
 
-  // Update the polygons and car_pose on the blackboard
+  // Update the polygons/car_pose/car_size/state on the blackboard
   blackboard->set<std::vector<geometry_msgs::msg::Polygon>>(polygons_blackboard_id_, goal->polygons);
   blackboard->set<geometry_msgs::msg::PoseStamped>(car_pose_blackboard_id_, goal->car_pose);
+  blackboard->set<geometry_msgs::msg::Vector3>(car_size_id_, goal->car_size);
+  // RCLCPP_INFO(logger_, "initializeGoalPose set state: %d", garage_utils_msgs::msg::State::INIT);
+  blackboard->set<uint8_t>(state_id_, garage_utils_msgs::msg::State::INIT);
 }
 
 }  // namespace garage_utils_pkg

@@ -62,6 +62,7 @@ BtNavigator::on_activate(const rclcpp_lifecycle::State & /*state*/)
 
   // create bond connection
   createBond();
+  RCLCPP_INFO(get_logger(), "after bound");
 
   return nav2_util::CallbackReturn::SUCCESS;
 }

@@ -1,37 +1,5 @@
 <root main_tree_to_execute="MainTree">
-  <BehaviorTree id="NavigateToPoseWithReplanningAndRecovery">
-    <!--NavigateToPoseWithReplanningAndRecovery.xml -->
-  </BehaviorTree>
   <BehaviorTree ID="MainTree">
-    <RecoveryNode number_of_retries="5" name="NavigateRecovery">
-        <Sequence>
-            <HaveFoundFreeParkingSpace/>
-            <SubTree id="NavigateToPose" goal="{goal}"></SubTree>
-            <Wait wait_duration="30"/>
-        </Sequence>
-        <PipeLineSequence>
-            <RateController hz="5.0">
-                <RecoveryNode number_of_retries="1" name="ComputeRightEdgePath">
-                    <ComputeRightEdgePath polygons="{polygons}" path="{path}"/>
-                    <Fallback>
-                        <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>    
-                    </Fallback>
-                </RecoveryNode>
-            </RateController>
-            <RecoveryNode number_of_retries="2" name="FollowPath">
-                <FollowPath path="{path}" controller_id="FollowPath"/>
-                <Fallback>
-                    <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
-                </Fallback>
-            </RecoveryNode>
-            <RecoveryNode number_of_retries="2" name="LookupVacantParkingSpace">
-                <LookupVacantParkingSpace goal="{goal}"/>
-                <Fallback>
-                    <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>
-                    <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
-                </Fallback>
-            </RecoveryNode>            
-        </PipeLineSequence>
-    </RecoveryNode>
+        <ComputeRightEdgePath polygons="{polygons}" car_pose="{car_pose}" garage_path="{garage_path}" state="{state}" />
   </BehaviorTree>
 </root>

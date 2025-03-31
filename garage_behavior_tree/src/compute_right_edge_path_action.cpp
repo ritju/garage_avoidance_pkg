@@ -32,45 +32,49 @@ void ComputeRightEdgePathAction::on_tick()
 {
   getInput("polygons", goal_.polygons);
   getInput("car_pose", goal_.car_pose);
+  // RCLCPP_INFO(node_->get_logger(), "on tick set state %d", garage_utils_msgs::msg::State::GENERATE_PATH);
+  setOutput("state", garage_utils_msgs::msg::State::GENERATE_PATH);
 
-  double rects_[][4][2] = {
-        {{1.0, 0.0}, {1.0, 20.0}, {-1.0, 20.0}, {-1.0, 0.0}},
-        {{1.5, 6.0}, {15.0, 6.0}, {15, 8.0}, {1.5, 8.0}},
-        {{1.5, 13.0}, {15.0, 13.0}, {15, 15.0}, {1.5, 15.0}},
-        {{-10.0, 20.5}, {10.0, 20.5}, {10.0, 22.5}, {-10, 22.5}},
-        {{10.5, 22.0}, {12.5, 22.0}, {12.5, 33.0}, {10.5, 33.0}},
-        {{-13.0, 10.0}, {-11.0, 30.0}, {-13.0, 30.0}, {-11.0, 10.0}}  // 打乱顺序
-  };
-  int number = 6;
+  // just for test
+  // double rects_[][4][2] = {
+  //       {{1.0, 0.0}, {1.0, 20.0}, {-1.0, 20.0}, {-1.0, 0.0}},
+  //       {{1.5, 6.0}, {15.0, 6.0}, {15, 8.0}, {1.5, 8.0}},
+  //       {{1.5, 13.0}, {15.0, 13.0}, {15, 15.0}, {1.5, 15.0}},
+  //       {{-10.0, 20.5}, {10.0, 20.5}, {10.0, 22.5}, {-10, 22.5}},
+  //       {{10.5, 22.0}, {12.5, 22.0}, {12.5, 33.0}, {10.5, 33.0}},
+  //       {{-13.0, 10.0}, {-11.0, 30.0}, {-13.0, 30.0}, {-11.0, 10.0}}  // 打乱顺序
+  // };
+  // int number = 6;
 
-  double car_coord[2] = {0.0 , 2.0};  // car的 x,y 坐标
+  // double car_coord[2] = {0.0 , 2.0};  // car的 x,y 坐标
 
-  geometry_msgs::msg::PoseStamped car_pose;
-  car_pose.header.frame_id = "map";
-  car_pose.pose.position.x = car_coord[0];
-  car_pose.pose.position.y = car_coord[1];
+  // geometry_msgs::msg::PoseStamped car_pose;
+  // car_pose.header.frame_id = "map";
+  // car_pose.pose.position.x = car_coord[0];
+  // car_pose.pose.position.y = car_coord[1];
   
-  std::vector<geometry_msgs::msg::Polygon> polygons;
-  for (int i = 0; i < number; i++)
-  {
-          geometry_msgs::msg::Polygon polygon;
-          for (int j = 0; j < 4; j++)
-          {
-                  geometry_msgs::msg::Point32 point;
-                  point.x = rects_[i][j][0];
-                  point.y = rects_[i][j][1];
-                  polygon.points.push_back(point);
-          }
-          polygons.push_back(polygon);
-  }
+  // std::vector<geometry_msgs::msg::Polygon> polygons;
+  // for (int i = 0; i < number; i++)
+  // {
+  //         geometry_msgs::msg::Polygon polygon;
+  //         for (int j = 0; j < 4; j++)
+  //         {
+  //                 geometry_msgs::msg::Point32 point;
+  //                 point.x = rects_[i][j][0];
+  //                 point.y = rects_[i][j][1];
+  //                 polygon.points.push_back(point);
+  //         }
+  //         polygons.push_back(polygon);
+  // }
 
-  goal_.car_pose = car_pose;
-  goal_.polygons = polygons;
+  // goal_.car_pose = car_pose;
+  // goal_.polygons = polygons;
 }
 
 BT::NodeStatus ComputeRightEdgePathAction::on_success()
 {
   setOutput("garage_path", result_.result->path);
+  // RCLCPP_INFO(node_->get_logger(), "path size: %zd", result_.result->path.poses.size());
   return BT::NodeStatus::SUCCESS;
 }
 

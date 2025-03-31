@@ -1,0 +1,12 @@
+bt_garage_navigator:
+  ros__parameters:
+    use_sim: false
+
+lifecycle_manager:
+  ros__parameters:
+    autostart:true:
+    node_names:
+      [
+        "bt_garage_navigator",
+      ]
+    bond_timeout: 4.0

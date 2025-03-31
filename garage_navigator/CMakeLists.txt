@@ -9,8 +9,11 @@ find_package(rclcpp_lifecycle REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(behaviortree_cpp_v3 REQUIRED)
+find_package(nav2_util REQUIRED)
+find_package(nav2_core REQUIRED)
+find_package(nav2_behavior_tree REQUIRED)
+
 find_package(garage_utils_msgs REQUIRED)
-find_package(smclib_header REQUIRED)
 
 nav2_package()
 
@@ -26,23 +29,18 @@ add_executable(${executable_name}
 
 set(library_name ${executable_name}_core)
 
+
 set(dependencies
   rclcpp
   rclcpp_action
   rclcpp_lifecycle
   rclcpp_components
-  std_msgs
   geometry_msgs
-  nav2_behavior_tree
-  nav_msgs
-  nav2_msgs
   behaviortree_cpp_v3
-  std_srvs
   nav2_util
   nav2_core
-  tf2_ros
   garage_utils_msgs
-  smclib
+  nav2_behavior_tree
 )
 
 add_library(${library_name} SHARED
@@ -62,13 +60,19 @@ ament_target_dependencies(${library_name}
 
 rclcpp_components_register_nodes(${library_name} "garage_utils_pkg::BtNavigator")
 
+# test node
+add_executable(test_action src/test.cpp)
+ament_target_dependencies(test_action
+  ${dependencies}
+)
+
 install(TARGETS ${library_name}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
 )
 
-install(TARGETS ${executable_name}
+install(TARGETS ${executable_name} test_action
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -76,7 +80,7 @@ install(DIRECTORY include/
   DESTINATION include/
 )
 
-install(DIRECTORY behavior_trees DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY behavior_trees launch params DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

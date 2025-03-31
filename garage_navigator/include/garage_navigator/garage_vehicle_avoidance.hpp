@@ -7,7 +7,9 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "garage_navigator/navigator.hpp"
+
 #include "garage_utils_msgs/action/garage_vehicle_avoidance.hpp"
+#include "garage_utils_msgs/msg/state.hpp"
 
 namespace garage_utils_pkg
 {
@@ -103,6 +105,8 @@ protected:
   std::string polygons_blackboard_id_;
   std::string car_pose_blackboard_id_;
   std::string path_blackboard_id_;
+  std::string car_size_id_;
+  std::string state_id_;
 
 };
 

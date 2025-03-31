@@ -1,17 +1,13 @@
 geometry_msgs/Polygon[] polygons   # 机器人要遍历的通道列表（map坐标系下）
 geometry_msgs/PoseStamped car_pose # 汽车的位置信息（map坐标系下）
 geometry_msgs/TwistStamped car_vel # 汽车的速度（map坐标系下）
+geometry_msgs/Vector3 car_size     # 汽车的尺寸
 string behavior_tree               # 行为树
 ---
 bool success                       # 是否成功执行
 string reason                      # 被拒绝的原因
 
 ---
-uint8 SEARCHING_PARKING_SPACE = 0                   # 搜寻停靠点
-uint8 MOVING_TO_PARKING_SPACE = 1                   # 前往停靠点
-uint8 GENERATE_PATH = 2                             # 生成路径
-uint8 THROUGH_POSES_AND_SEARCHING_PARKING_SPACE = 3 # 边走边找停靠点
-uint8 WAITING = 4                                   # 等待车辆通过
 uint8 state
 
 

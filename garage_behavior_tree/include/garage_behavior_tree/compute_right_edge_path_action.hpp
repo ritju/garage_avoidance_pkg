@@ -9,6 +9,8 @@
 #include "nav_msgs/msg/path.h"
 #include "garage_behavior_tree/bt_action_node.hpp"
 
+#include "garage_utils_msgs/msg/state.hpp"
+
 namespace garage_utils_pkg
 {
 
@@ -63,8 +65,9 @@ public:
     return providedBasicPorts(
       {
         BT::OutputPort<nav_msgs::msg::Path>("garage_path", "Path created by ComputeRightEdgePath node"),
-        BT::InputPort<geometry_msgs::msg::PoseStamped>("polygons", "rects list"),
+        BT::InputPort<std::vector<geometry_msgs::msg::Polygon>>("polygons", "rects list"),
         BT::InputPort<geometry_msgs::msg::PoseStamped>("car_pose", "the pose of car"),
+        BT::OutputPort<uint8_t>("state", "behavior tree state"),
       });
   }
 };

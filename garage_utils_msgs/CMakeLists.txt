@@ -31,6 +31,7 @@ find_package(std_msgs REQUIRED)
 #添加消息文件和依赖
 rosidl_generate_interfaces(${PROJECT_NAME}
   #---msg--
+  "msg/State.msg"
   #---srv---
   #---action---
   "action/ComputeRightEdgePath.action"
