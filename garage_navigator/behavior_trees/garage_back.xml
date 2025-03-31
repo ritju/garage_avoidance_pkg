@@ -2,19 +2,17 @@
   <BehaviorTree ID="MainTree">
     <RecoveryNode number_of_retries="5" name="NavigateRecovery">
         <Sequence>
-            <HaveFoundFreeParkingSpace/>
-            <SubTree id="NavigateToPose" goal="{goal}"></SubTree>
+            <RecoveryNode number_of_retries="5" >
+                <HaveFoundFreeParkingSpace/>
+                <Wait wait_duration="1"/>
+            </RecoveryNode>
+            <MoveToFreeSpace/>
             <Wait wait_duration="30"/>
         </Sequence>
         <PipeLineSequence>
-            <RateController hz="5.0">
-                <RecoveryNode number_of_retries="1" name="ComputeRightEdgePath">
-                    <ComputeRightEdgePath polygons="{polygons}" path="{path}"/>
-                    <Fallback>
-                        <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>    
-                    </Fallback>
-                </RecoveryNode>
-            </RateController>
+            <SingleTrigger>
+                <ComputeRightEdgePath polygons="{polygons}" car_pose="{car_pose}" garage_path="{garage_path}" state="{state}" />
+            </SingleTrigger>
             <RecoveryNode number_of_retries="2" name="FollowPath">
                 <FollowPath path="{path}" controller_id="FollowPath"/>
                 <Fallback>
