@@ -6,6 +6,15 @@
   <description>TODO: Package description</description>
   <maintainer email="1024988917@qq.com">ros</maintainer>
   <license>TODO: License declaration</license>
+  
+  <depend>rclcpp</depend>
+  <depend>rclcpp_action</depend>
+  <depend>rclcpp_components</depend>
+  <depend>nav_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <build_depend>garage_utils_msgs</build_depend>

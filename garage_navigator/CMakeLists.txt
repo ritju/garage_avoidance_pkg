@@ -32,6 +32,7 @@ set(library_name ${executable_name}_core)
 
 
 set(dependencies
+  ament_cmake
   rclcpp
   rclcpp_action
   rclcpp_lifecycle

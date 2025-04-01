@@ -8,10 +8,18 @@
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
-  <depend>garage_utils_msgs</depend>
-  <depend>behaviortree_cpp_v3</depend>
-  <depend>pluginlib</depend>
   <build_depend>garage_behavior_tree</build_depend>
+  <build_depend>garage_utils_msgs</build_depend>
+ 
+  <depend>behaviortree_cpp_v3</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_action</depend>
+  <depend>rclcpp_lifecycle</depend>
+  <depend>rclcpp_components</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav2_util</depend>
+  <depend>nav2_core</depend>
+  <depend>nav2_behavior_tree</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

@@ -9,7 +9,20 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <build_depend>garage_utils_msgs</build_depend>
-  <build_depend>nav2_common</build_depend>
+
+  <depend>nav2_common</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_action</depend>
+  <depend>rclcpp_lifecycle</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav2_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>behaviortree_cpp_v3</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>nav2_util</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
