@@ -1,5 +1,5 @@
 compute_right_edge_path_action_server:
   ros__parameters:
-    path_topic_name: "garage_path"
+    path_topic_name: "garage_path2"
     dis_thr: 2.5
-    reolution: 1.0
+    resolution: 2.1

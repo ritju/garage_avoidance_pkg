@@ -75,7 +75,8 @@ BT::NodeStatus ComputeRightEdgePathAction::on_success()
 {
   setOutput("garage_path", result_.result->path);
   setOutput("goals", result_.result->poses);
-  // RCLCPP_INFO(node_->get_logger(), "path size: %zd", result_.result->path.poses.size());
+  RCLCPP_INFO(node_->get_logger(), "path size: %zd", result_.result->path.poses.size());
+  RCLCPP_INFO(node_->get_logger(), "goal size: %zd", result_.result->poses.size());
   return BT::NodeStatus::SUCCESS;
 }
 

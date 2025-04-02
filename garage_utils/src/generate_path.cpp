@@ -349,7 +349,7 @@ namespace garage_utils_pkg
         void GeneratePath::init_params()
         {
                 this->offset_ = this->node_->get_parameter_or<double>("offset", 0.2);
-                this->resolution_ = this->node_->get_parameter_or<double>("resolution", 0.05);
+                this->resolution_ = this->node_->get_parameter_or<double>("resolution", 2.5);
         }
 
         std::vector<std::pair<double, double>> GeneratePath::offset(double dis, std::pair<double, double> pt1, std::pair<double, double> pt2) 

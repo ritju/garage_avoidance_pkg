@@ -39,6 +39,7 @@ namespace garage_utils_pkg
         {
                 this->declare_parameter<std::string>("path_topic_name", "garage_path");
                 this->declare_parameter<double>("dis_thr", 2.5);
+                this->declare_parameter<double>("resolution", 2.0);
 
                 this->dis_thr_ = this->get_parameter_or("dis_thr", 2.5);
                 this->path_topic_name_ = this->get_parameter_or("path_topic_name", std::string("garage_path"));

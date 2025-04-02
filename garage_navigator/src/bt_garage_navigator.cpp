@@ -19,7 +19,16 @@ BtNavigator::BtNavigator(const rclcpp::NodeOptions & options)
   RCLCPP_INFO(get_logger(), "Creating");
 
   const std::vector<std::string> plugin_libs = {
-    "compute_right_edge_path_action"
+    "compute_right_edge_path_action",
+    "nav2_pipeline_sequence_bt_node",
+    "nav2_recovery_node_bt_node",
+    "nav2_rate_controller_bt_node",
+    "nav2_compute_path_through_poses_action_bt_node",
+    "nav2_round_robin_node_bt_node",
+    "nav2_clear_costmap_service_bt_node",
+    "nav2_follow_path_action_bt_node",
+    "nav2_goal_updated_condition_bt_node",
+    "nav2_wait_action_bt_node"
   };
 
   declare_parameter("plugin_lib_names", plugin_libs);
@@ -62,7 +71,7 @@ BtNavigator::on_activate(const rclcpp_lifecycle::State & /*state*/)
 
   // create bond connection
   createBond();
-  RCLCPP_INFO(get_logger(), "after bound");
+  // RCLCPP_INFO(get_logger(), "after bound");
 
   return nav2_util::CallbackReturn::SUCCESS;
 }
