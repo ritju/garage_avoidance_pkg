@@ -19,7 +19,7 @@ BtNavigator::BtNavigator(const rclcpp::NodeOptions & options)
   RCLCPP_INFO(get_logger(), "Creating");
 
   const std::vector<std::string> plugin_libs = {
-    "compute_right_edge_path_action",
+    // "compute_right_edge_path_action",
     "nav2_pipeline_sequence_bt_node",
     "nav2_recovery_node_bt_node",
     "nav2_rate_controller_bt_node",

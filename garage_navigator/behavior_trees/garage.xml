@@ -2,6 +2,9 @@
   <BehaviorTree ID="MainTree">
         <Sequence>
           <ComputeRightEdgePath polygons="{polygons}" car_pose="{car_pose}" garage_path="{garage_path}" goals="{goals}" state="{state}" />
+          <Wait wait_duration="1"/>
+          <Wait wait_duration="1"/>
+          <SubTree ID="sub_test" ros_node="{ros_node}"  __shared_blackboard="true" />
           <PipelineSequence name="NavigateWithReplanning">
             <RateController hz="0.2">
               <RecoveryNode number_of_retries="2" name="ComputePathThroughPoses">
@@ -18,6 +21,10 @@
             </RecoveryNode>
           </PipelineSequence>
         </Sequence>
+  </BehaviorTree>
+
+  <BehaviorTree ID="sub_test">
+    <Wait wait_duration="1"/>
   </BehaviorTree>
   
 </root>

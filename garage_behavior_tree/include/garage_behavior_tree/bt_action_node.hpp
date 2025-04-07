@@ -50,10 +50,13 @@ public:
   : BT::ActionNodeBase(xml_tag_name, conf), action_name_(action_name)
   {
     auto node_dump = std::make_shared<rclcpp::Node>("node_dump");
+    RCLCPP_INFO(node_dump->get_logger(), "-----------------");
     RCLCPP_INFO(node_dump->get_logger(), "before get node key");
     node_ = config().blackboard->template get<rclcpp::Node::SharedPtr>("node");
     RCLCPP_INFO(node_dump->get_logger(), "after get node key");
     RCLCPP_INFO(node_->get_logger(), "node name: %s", node_->get_name());
+    RCLCPP_INFO(node_->get_logger(), "action name: %s", action_name_.c_str());
+
     callback_group_ = node_->create_callback_group(
       rclcpp::CallbackGroupType::MutuallyExclusive,
       false);

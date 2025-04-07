@@ -1,6 +1,17 @@
 bt_garage_navigator:
   ros__parameters:
     use_sim: false
+    plugin_lib_names:
+      - "compute_right_edge_path_action"
+      - "nav2_pipeline_sequence_bt_node"
+      - "nav2_recovery_node_bt_node"
+      - "nav2_rate_controller_bt_node"
+      - "nav2_compute_path_through_poses_action_bt_node"
+      - "nav2_round_robin_node_bt_node"
+      - "nav2_clear_costmap_service_bt_node"
+      - "nav2_follow_path_action_bt_node"
+      - "nav2_goal_updated_condition_bt_node"
+      - "nav2_wait_action_bt_node"
 
 lifecycle_manager:
   ros__parameters:
