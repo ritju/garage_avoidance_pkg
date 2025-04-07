@@ -1,21 +1,13 @@
 <root main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
-    <RecoveryNode number_of_retries="5" name="NavigateRecovery">
         <Sequence>
-            <RecoveryNode number_of_retries="5" >
-                 <FindCarAvoidancePoint polygons="{polygons}" car_pose="{car_pose}" car_size="{car_size}" free_point="{free_point}" />
-                <Wait wait_duration="1"/>
-            </RecoveryNode>
-            <WeltModelNode goal_pose="{free_point}" />
-            <Wait wait_duration="30"/>
-        </Sequence>
-
-        <!-- <PipeLineSequence> -->
-          <SingleTrigger>
-              <ComputeRightEdgePath polygons="{polygons}" car_pose="{car_pose}" garage_path="{garage_path}" goals="{goals}" state="{state}" />
-          </SingleTrigger>
-          
-          <!-- <PipelineSequence name="NavigateThroughPoses">
+          <WeltModelNode goal_pose="{free_point}" />
+          <FindCarAvoidancePoint polygons="{polygons}" car_pose="{car_pose}" car_size="{car_size}" free_point="{free_point}" />
+          <ComputeRightEdgePath polygons="{polygons}" car_pose="{car_pose}" garage_path="{garage_path}" goals="{goals}" state="{state}" />
+          <Wait wait_duration="1"/>
+          <Wait wait_duration="1"/>
+          <SubTree ID="sub_test" ros_node="{ros_node}"  __shared_blackboard="true" />
+          <PipelineSequence name="NavigateWithReplanning">
             <RateController hz="0.2">
               <RecoveryNode number_of_retries="2" name="ComputePathThroughPoses">
                 <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="GridBased"/>
@@ -30,9 +22,11 @@
               </Sequence>
             </RecoveryNode>
           </PipelineSequence>
-                               
-        </PipeLineSequence> -->
-
-    </RecoveryNode>
+        </Sequence>
   </BehaviorTree>
+
+  <BehaviorTree ID="sub_test">
+    <Wait wait_duration="1"/>
+  </BehaviorTree>
+  
 </root>

@@ -16,7 +16,7 @@ namespace garage_utils_pkg
                 explicit ShortestPathSearch(rclcpp::Node::SharedPtr node);
                 ~ShortestPathSearch();
 
-                void process_(const std::vector<EnhancedPoint>& points);
+                void process_(const std::vector<EnhancedPoint>& points, const int& start_index);
 
                 std::vector<int> generate_path1(const std::vector<EnhancedPoint>& points); // dijstra算法
                 std::vector<int> generate_path2(const std::vector<EnhancedPoint>& points); // dfs算法
@@ -34,6 +34,8 @@ namespace garage_utils_pkg
                 bool in_vector(std::vector<T>, T index);
 
                 void filter_path(const std::vector<EnhancedPoint> points, std::vector<int>& path);
+
+                int get_start_point_index(double robot_x, double robot_y, const std::vector<EnhancedPoint>& points);
                 
         
         private:

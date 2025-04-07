@@ -17,6 +17,7 @@
   <depend>tf2_ros</depend>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>capella_ros_msg</build_depend>
   <build_depend>garage_utils_msgs</build_depend>
 
   <test_depend>ament_lint_auto</test_depend>

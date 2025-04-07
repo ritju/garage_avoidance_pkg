@@ -61,7 +61,10 @@ int main(int argc, char** argv)
         try
         {
                 auto path_searcher = new garage_utils_pkg::ShortestPathSearch(node);
-                path_searcher->process_(e_points);
+                double robot_x = 2.0;
+                double robot_y = 0.0;
+                int start_index = path_searcher->get_start_point_index(robot_x, robot_y, e_points);
+                path_searcher->process_(e_points, start_index);
                 
                 auto path = path_searcher->get_path();
                 path_searcher->filter_path(e_points, path);

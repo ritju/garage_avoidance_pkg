@@ -512,7 +512,7 @@ namespace garage_utils_pkg
                 dis_pt_pt1 = distance(pt_intersection.first, pt_intersection.second, edge_intersection.pt1.first, edge_intersection.pt1.second);
                 dis_pt_pt2 = distance(pt_intersection.first, pt_intersection.second, edge_intersection.pt2.first, edge_intersection.pt2.second);
                 NeighborType intersection_type; // 0: 两个顶点相交， 1: 顶点与边体相交
-                if (dis_pt_pt1 == dis_min)
+                if (dis_pt_pt1 == dis_min || dis_pt_pt1 < dis_thr_)
                 {
                         intersection_type = NeighborType::POINT_POINT;
                         pt_intersection_2 = edge_intersection.pt1;

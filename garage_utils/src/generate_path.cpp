@@ -201,27 +201,53 @@ namespace garage_utils_pkg
                 px = (pt1.coord.first + pt2.coord.first) / 2.0;
                 py = (pt1.coord.second + pt2.coord.second) / 2.0;
 
+                RCLCPP_INFO(node_->get_logger(), "px => %f", px);
+                RCLCPP_INFO(node_->get_logger(), "py => %f", py);
+
                 for (size_t i = 0; i < polygons.size(); i++)
                 {
-                        std::vector<std::pair<double, double>> polygon_compare;
+                        std::vector<Vertex> polygon_compare;
 
                         geometry_msgs::msg::Polygon polygon_one = polygons[i];
                         
                         for (size_t j = 0; j < polygon_one.points.size(); j++)
                         {
-                                std::pair<double, double> pt;
-                                pt.first = polygon_one.points[j].x;
-                                pt.second = polygon_one.points[j].y;
+                                Vertex pt;
+                                pt.x = polygon_one.points[j].x;
+                                pt.y = polygon_one.points[j].y;
                                 polygon_compare.push_back(pt);
                         }
+
+                        // 顶点排序
+                        double cx = 0, cy = 0;
+                        for (const auto& v : polygon_compare) 
+                        {
+                                cx += v.x;
+                                cy += v.y;
+                                // RCLCPP_INFO(node_->get_logger(), "x: %.1f, y: %.1f, cx: %.1f, cy: %.1f", v.x, v.y, cx, cy);
+                        }
+                        cx /= polygon_compare.size();
+                        cy /= polygon_compare.size();
+                        // 计算各顶点极角并排序‌
+                        for (auto& v : polygon_compare) 
+                        {
+                                double dx = v.x - cx;
+                                double dy = v.y - cy;
+                                v.angle = atan2(dy, dx);  // 极角公式
+
+                        }
+                        // 按极角升序排序（顺时针）
+                        std::sort(polygon_compare.begin(), polygon_compare.end(), 
+                                [](const Vertex& a, const Vertex& b) { return a.angle < b.angle; });
+
                         if (isPointInPolygon(px, py, polygon_compare))
                         {
                                 RCLCPP_INFO(node_->get_logger(), "result => rect index: %zd, [ (%f, %f), (%f, %f), (%f, %f), (%f, %f) ]", 
                                         i,
-                                        polygon_compare[0].first, polygon_compare[0].second,
-                                        polygon_compare[1].first, polygon_compare[1].second,
-                                        polygon_compare[2].first, polygon_compare[2].second,
-                                        polygon_compare[3].first, polygon_compare[3].second
+                                        polygon_compare[0].x, polygon_compare[0].y,
+                                        polygon_compare[1].x, polygon_compare[1].y,
+                                        polygon_compare[2].x, polygon_compare[2].y,
+                                        polygon_compare[3].x, polygon_compare[3].y
                                         );
                                 return i;
                         }
@@ -310,6 +336,15 @@ namespace garage_utils_pkg
                 distance_add += this->resolution_;  
                 // RCLCPP_INFO(node_->get_logger(), "length: %f, distance_add: %f", length, distance_add);        
               }
+
+              // 添加end端点作为path终点
+              geometry_msgs::msg::PoseStamped pose_end;
+              pose_end.header.frame_id = "map";
+              pose_end.pose.position.x = path_end.first;
+              pose_end.pose.position.y = path_end.second;
+              path.poses.push_back(pose_end);
+              RCLCPP_INFO(node_->get_logger(), "end => x: %f, y: %f", path_end.first, path_end.second);
+
               return path;
         }
 
@@ -441,9 +476,9 @@ namespace garage_utils_pkg
                 return fabs(cross) < 1e-8;
         }
 
-        bool GeneratePath::isPointInPolygon(double px, double py, const std::vector<std::pair<double, double>>& polygon)
+        bool GeneratePath::isPointInPolygon(double px, double py, const std::vector<Vertex> polygon)
         {
-                if (polygon.size() < 3) return false;
+                if (polygon.size() != 4) return false;
 
                 bool result = false;
                 const double infinity = std::numeric_limits<double>::max();
@@ -455,18 +490,18 @@ namespace garage_utils_pkg
                         const auto& p2 = polygon[(i+1)%n];
 
                         // 首先检查点是否在边上
-                        if (isPointOnSegment(px, py, p1.first, p1.second, p2.first, p2.second))
+                        if (isPointOnSegment(px, py, p1.x, p1.y, p2.x, p2.y))
                         return true;
 
                         // 射线与边段的相交判断‌
-                        if ((p1.second > py) != (p2.second > py)) 
+                        if ((p1.y > py) != (p2.y > py)) 
                         {
-                                // 计算射线与边的交点x坐标‌:ml-citation{ref="1,2" data="citationList"}
-                                double intersectX = (p2.first - p1.first) * (py - p1.second) 
-                                                / (p2.second - p1.second) + p1.first;
+                                // 计算射线与边的交点x坐标‌
+                                double intersectX = (p2.x - p1.x) * (py - p1.y) 
+                                                / (p2.y - p1.y) + p1.x;
 
                                 // 处理水平边的情况‌
-                                if (p1.second == p2.second) continue;
+                                if (p1.y == p2.y) continue;
 
                                 // 判断交点是否在射线右侧
                                 if (px <= intersectX) 

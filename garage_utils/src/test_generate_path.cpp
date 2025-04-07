@@ -89,7 +89,10 @@ int main(int argc, char**argv)
         try
         {
                auto shortest_path_searcher = new garage_utils_pkg::ShortestPathSearch(node);
-               shortest_path_searcher->process_(e_points);
+               double robot_x = 2.0;
+               double robot_y = 0.0;
+               auto index_start = shortest_path_searcher->get_start_point_index(robot_x, robot_y, e_points);
+               shortest_path_searcher->process_(e_points, index_start);
                auto order = shortest_path_searcher->get_path();
                shortest_path_searcher->filter_path(e_points, order);
 

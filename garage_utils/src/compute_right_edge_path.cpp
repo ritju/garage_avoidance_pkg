@@ -161,12 +161,13 @@ namespace garage_utils_pkg
                         car_y = goal->car_pose.pose.position.y;
 
                         // tmp, !!!!!!!!!!!!!!! delete atfer test !!!!!!!!!!!!!!
-                        robot_x = 0.0;
-                        robot_y = 3.0;
+                        // robot_x = 0.0;
+                        // robot_y = 3.0;
                         
                         RCLCPP_INFO(get_logger(), "robot_pose: (%f, %f)", robot_x, robot_y);
 
                         size_t current_index = get_current_polygon_index(map_robot_tf, polygons_);
+                        RCLCPP_INFO(get_logger(), "current_index: %ld", current_index);
                         auto polygon_first = this->polygons_[current_index];                
                         this->polygons_.erase(polygons_.begin() + current_index);
 
@@ -209,6 +210,12 @@ namespace garage_utils_pkg
                                 });
                         auto long_line1 = edges[0];
                         auto long_line2 = edges[1];
+                        RCLCPP_INFO(get_logger(), "long line1 => [ (%f, %f), (%f, %f) ]", 
+                                long_line1.first.first, long_line1.first.second,
+                                long_line1.second.first, long_line1.second.second);
+                        RCLCPP_INFO(get_logger(), "long line2 => [ (%f, %f), (%f, %f) ]", 
+                                long_line2.first.first, long_line2.first.second,
+                                long_line2.second.first, long_line2.second.second);
                         
                         // 选取原有的两个顶点
                         Point p1_selected, p2_selected;
@@ -327,7 +334,8 @@ namespace garage_utils_pkg
                         }
 
                         // 2、把points排序，生成路线
-                        path_searcher_->process_(points);
+                        int start_index = path_searcher_->get_start_point_index(robot_x, robot_y, points);
+                        path_searcher_->process_(points, start_index);
 
                         auto path = path_searcher_->get_path();
                         path_searcher_->filter_path(points, path);

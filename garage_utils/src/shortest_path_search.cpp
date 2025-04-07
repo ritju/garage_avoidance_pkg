@@ -13,7 +13,7 @@ namespace garage_utils_pkg
              RCLCPP_INFO(node_->get_logger(), "ShortestPathSearch destructor.");   
         }
 
-        void ShortestPathSearch::process_(const std::vector<EnhancedPoint>& points)
+        void ShortestPathSearch::process_(const std::vector<EnhancedPoint>& points, const int& start_index)
         {
                 this->points_ = points;
 
@@ -24,7 +24,7 @@ namespace garage_utils_pkg
                 this->distance_ = 0.0;
                 this->path_.clear();
 
-                get_sub_path(this->points_, -1, 0, distance_, path_);
+                get_sub_path(this->points_, -1, start_index, distance_, path_);
         }
 
         std::vector<int> ShortestPathSearch::generate_path1(const std::vector<EnhancedPoint>& points)
@@ -277,6 +277,27 @@ namespace garage_utils_pkg
                 }
 
                 path = path_new;
+        }
+
+        int ShortestPathSearch::get_start_point_index(double robot_x, double robot_y, const std::vector<EnhancedPoint>& points)
+        {
+                int index = 0;
+                double dis_min = std::numeric_limits<double>::max();
+                for (size_t i = 0; i < points.size(); i++)
+                {
+                        auto point = points[i];
+                        double point_x, point_y;
+                        point_x = point.coord.first;
+                        point_y = point.coord.second;
+                        double dis = std::hypot(point_x - robot_x, point_y - robot_y);
+                        if (dis < dis_min)
+                        {
+                                dis_min = dis;
+                                index = (int)i;
+                        }
+                }                
+
+                return index;
         }
         
 

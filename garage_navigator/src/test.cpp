@@ -4,17 +4,23 @@
 #include "rclcpp_action/rclcpp_action.hpp"
 
 
-double rects_[][4][2] = {
-        {{1.0, 0.0}, {1.0, 20.0}, {-1.0, 20.0}, {-1.0, 0.0}},
-        {{1.5, 6.0}, {15.0, 6.0}, {15, 8.0}, {1.5, 8.0}},
-        {{1.5, 13.0}, {15.0, 13.0}, {15, 15.0}, {1.5, 15.0}},
-        {{-10.0, 20.5}, {10.0, 20.5}, {10.0, 22.5}, {-10, 22.5}},
-        {{10.5, 22.0}, {12.5, 22.0}, {12.5, 33.0}, {10.5, 33.0}},
-        {{-13.0, 10.0}, {-11.0, 30.0}, {-13.0, 30.0}, {-11.0, 10.0}}  // 打乱顺序
-};
-int number = 6;
+// double rects_[][4][2] = {
+//         {{1.0, 0.0}, {1.0, 20.0}, {-1.0, 20.0}, {-1.0, 0.0}},
+//         {{1.5, 6.0}, {15.0, 6.0}, {15, 8.0}, {1.5, 8.0}},
+//         {{1.5, 13.0}, {15.0, 13.0}, {15, 15.0}, {1.5, 15.0}},
+//         {{-10.0, 20.5}, {10.0, 20.5}, {10.0, 22.5}, {-10, 22.5}},
+//         {{10.5, 22.0}, {12.5, 22.0}, {12.5, 33.0}, {10.5, 33.0}},
+//         {{-13.0, 10.0}, {-11.0, 30.0}, {-13.0, 30.0}, {-11.0, 10.0}}  // 打乱顺序
+// };
+// int number = 6;
 
-double car_coord[2] = {0.0 , 2.0};  // car的 x,y 坐标
+double rects_[][4][2] = {
+        {{4.5, -6.0}, {4.0, 0.0}, {2.0, 0.0}, {2.5, -6.0}},
+        {{2.0, 0.0}, {-5.0, 0.0}, {-5.0, -2.0}, {2.0, -2.0}}
+};
+int number = 2;
+
+double car_coord[2] = {3.0 , -7.0};  // car的 x,y 坐标
 
 void goal_response_callback(const rclcpp_action::ClientGoalHandle<garage_utils_msgs::action::GarageVehicleAvoidance>::SharedPtr& goal_handle)
 {
@@ -96,7 +102,9 @@ int main(int argc, char** argv)
         }
 
         auto goal_msg = garage_utils_msgs::action::GarageVehicleAvoidance::Goal();
-        goal_msg.car_pose = car_pose;
+        capella_ros_msg::msg::CarDetectSingle car_information;
+        car_information.pose = car_pose;
+        goal_msg.cars_information.results.push_back(car_information);
         goal_msg.polygons = polygons;
         
         RCLCPP_INFO(node->get_logger(), "Sending goal");

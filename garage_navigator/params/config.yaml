@@ -3,6 +3,7 @@ bt_garage_navigator:
     use_sim: false
     plugin_lib_names:
       - "compute_right_edge_path_action"
+      - "find_car_avoidance_point_action"
       - "nav2_pipeline_sequence_bt_node"
       - "nav2_recovery_node_bt_node"
       - "nav2_rate_controller_bt_node"
@@ -12,6 +13,8 @@ bt_garage_navigator:
       - "nav2_follow_path_action_bt_node"
       - "nav2_goal_updated_condition_bt_node"
       - "nav2_wait_action_bt_node"
+      - "welt_model_node"
+      - "nav2_single_trigger_bt_node"
 
 lifecycle_manager:
   ros__parameters:
@@ -19,5 +22,6 @@ lifecycle_manager:
     node_names:
       [
         "bt_garage_navigator",
+        "robot_avoidance"
       ]
     bond_timeout: 4.0

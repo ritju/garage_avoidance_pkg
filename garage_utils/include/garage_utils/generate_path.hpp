@@ -24,7 +24,7 @@ namespace garage_utils_pkg
                 std::pair<Point, Point> generate_path_for_one_segment2(const EnhancedPoint& pt1, const EnhancedPoint& pt2, const geometry_msgs::msg::Polygon& polygons);
 
                 bool isPointOnSegment(double px, double py, double x1, double y1, double x2, double y2);
-                bool isPointInPolygon(double px, double py, const std::vector<std::pair<double, double>>& polygon);
+                bool isPointInPolygon(double px, double py, const std::vector<Vertex> polygon);
                 void sortVertices(EnhancedRect& rect); 
                 // 找到某一个点在线段上离它最近的点  
                 std::pair<double, double> find_neareast_point(double px, double py, double seg1x, double seg1y, double seg2x, double seg2y);  

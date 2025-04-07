@@ -163,8 +163,8 @@ GarageVehicleAvoidanceNavigator::initializeGoalPose(ActionT::Goal::ConstSharedPt
 
   // Update the polygons/car_pose/car_size/state on the blackboard
   blackboard->set<std::vector<geometry_msgs::msg::Polygon>>(polygons_blackboard_id_, goal->polygons);
-  blackboard->set<geometry_msgs::msg::PoseStamped>(car_pose_blackboard_id_, goal->car_pose);
-  blackboard->set<geometry_msgs::msg::Vector3>(car_size_id_, goal->car_size);
+  blackboard->set<geometry_msgs::msg::PoseStamped>(car_pose_blackboard_id_, goal->cars_information.results[0].pose);
+  blackboard->set<geometry_msgs::msg::Vector3>(car_size_id_, goal->cars_information.results[0].size);
   // RCLCPP_INFO(logger_, "initializeGoalPose set state: %d", garage_utils_msgs::msg::State::INIT);
   blackboard->set<uint8_t>(state_id_, garage_utils_msgs::msg::State::INIT);
 }

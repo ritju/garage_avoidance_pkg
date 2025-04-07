@@ -21,6 +21,7 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(nav2_util REQUIRED)
 find_package(garage_utils_msgs REQUIRED)
+find_package(capella_ros_msg REQUIRED)
 
 nav2_package()
 
@@ -46,11 +47,20 @@ set(dependencies
   std_msgs
   nav2_util
   garage_utils_msgs
+  capella_ros_msg
 )
 
+# compute_right_edge_path_action
 add_library(compute_right_edge_path_action SHARED src/compute_right_edge_path_action.cpp)
 list(APPEND plugin_libs compute_right_edge_path_action)
 
+
+# find_car_avoidance_point_action
+add_library(find_car_avoidance_point_action SHARED src/find_car_avoidance_point_action.cpp)
+list(APPEND plugin_libs find_car_avoidance_point_action)
+
+add_library(welt_model_node SHARED src/welt_model_node.cpp)
+list(APPEND plugin_libs welt_model_node)
 
 foreach(bt_plugin ${plugin_libs})
   ament_target_dependencies(${bt_plugin} ${dependencies})

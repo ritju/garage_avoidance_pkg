@@ -1,11 +1,9 @@
-geometry_msgs/Polygon[] polygons   # 机器人要遍历的通道列表（map坐标系下）
-geometry_msgs/PoseStamped car_pose # 汽车的位置信息（map坐标系下）
-geometry_msgs/TwistStamped car_vel # 汽车的速度（map坐标系下）
-geometry_msgs/Vector3 car_size     # 汽车的尺寸
-string behavior_tree               # 行为树
+geometry_msgs/Polygon[] polygons                   # 机器人要遍历的通道列表（map坐标系下）
+capella_ros_msg/CarDetectArray cars_information     # 汽车信息列表
+string behavior_tree                               # 行为树
 ---
-bool success                       # 是否成功执行
-string reason                      # 被拒绝的原因
+bool success                                       # 是否成功执行
+string reason                                      # 被拒绝的原因
 
 ---
 uint8 state
