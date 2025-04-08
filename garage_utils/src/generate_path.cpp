@@ -78,8 +78,17 @@ namespace garage_utils_pkg
                                 distance_add += this->resolution_;  
                                 // RCLCPP_INFO(node_->get_logger(), "length: %f, distance_add: %f", length, distance_add);        
                         }
+
+                        // 添加end端点作为path终点
+                        geometry_msgs::msg::PoseStamped pose_end;
+                        pose_end.header.frame_id = "map";
+                        pose_end.pose.position.x = path_end.first;
+                        pose_end.pose.position.y = path_end.second;
+                        path.poses.push_back(pose_end);
+                        RCLCPP_INFO(node_->get_logger(), "end => x: %f, y: %f", path_end.first, path_end.second);
                         this->path_.poses.insert(this->path_.poses.end(), path.poses.begin(), path.poses.end());
                }
+               add_orientation_for_path(this->path_);
                
         //        for (size_t i = 0; i < path_all.size(); i++)
         //        {
@@ -87,6 +96,20 @@ namespace garage_utils_pkg
         //             this->path_.poses.insert(this->path_.poses.end(), path_all[i].poses.begin(), path_all[i].poses.end());
         //        }
         }
+        
+        void GeneratePath::add_orientation_for_path(nav_msgs::msg::Path &path)
+        {
+                for (size_t i = 0; i < path.poses.size() - 1; i++)
+                {
+                        auto &point_start = path.poses[i].pose;
+                        auto &point_end = path.poses[i+1].pose;
+                        double theta = std::atan2(point_end.position.y - point_start.position.y, point_end.position.x - point_start.position.x);
+                        tf2::Quaternion quat;
+                        quat.setRPY(0.0, 0.0, theta);
+                        tf2::convert(quat, point_start.orientation);                        
+                }
+                path.poses[path.poses.size() - 1].pose.orientation = path.poses[path.poses.size() - 2].pose.orientation;
+        }   
 
         void GeneratePath::optimize_neighbored_path(std::vector<std::pair<Point, Point>>& path_all)
         {

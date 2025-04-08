@@ -17,6 +17,8 @@ from nav2_common.launch import RewrittenYaml
 def generate_launch_description():
     # Get the launch directory
     bringup_dir = get_package_share_directory('garage_navigator')
+    nav2_param_file = os.path.join(bringup_dir, "params", "dsf_nav2_for_ad_4_exhibition.yaml")
+    print(nav2_param_file)
 
     namespace = LaunchConfiguration('namespace')
     use_sim_time = LaunchConfiguration('use_sim_time')
@@ -28,7 +30,7 @@ def generate_launch_description():
     use_respawn = LaunchConfiguration('use_respawn')
     log_level = LaunchConfiguration('log_level')
 
-    lifecycle_nodes = ['bt_garage_navigator']
+    lifecycle_nodes = ['bt_garage_navigator', "robot_avoidance"]
 
     # Map fully qualified names to relative ones so the node's namespace can be prepended.
     # In case of the transforms (tf), currently, there doesn't seem to be a better alternative
@@ -108,7 +110,7 @@ def generate_launch_description():
                 output='screen',
                 respawn=use_respawn,
                 respawn_delay=2.0,
-                # parameters=[configured_params],
+                parameters=[nav2_param_file],
                 arguments=['--ros-args', '--log-level', log_level],
                 remappings=remappings),
             Node(

@@ -20,7 +20,8 @@ double rects_[][4][2] = {
 };
 int number = 2;
 
-double car_coord[2] = {3.0 , -7.0};  // car的 x,y 坐标
+double car_coord[2] = {3.0 , -7.0};   // car的 x,y 坐标
+double car_size[3] = {1.0, 0.5, 1.0}; // car的size
 
 void goal_response_callback(const rclcpp_action::ClientGoalHandle<garage_utils_msgs::action::GarageVehicleAvoidance>::SharedPtr& goal_handle)
 {
@@ -103,7 +104,12 @@ int main(int argc, char** argv)
 
         auto goal_msg = garage_utils_msgs::action::GarageVehicleAvoidance::Goal();
         capella_ros_msg::msg::CarDetectSingle car_information;
+        geometry_msgs::msg::Vector3 size;
+        size.x = car_size[0];
+        size.y = car_size[1];
+        size.z = car_size[2];
         car_information.pose = car_pose;
+        car_information.size = size;
         goal_msg.cars_information.results.push_back(car_information);
         goal_msg.polygons = polygons;
         
