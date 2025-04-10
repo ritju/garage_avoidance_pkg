@@ -1,57 +1,95 @@
 <root main_tree_to_execute="MainTree">
-  <BehaviorTree ID="MainTree">
-    <PipelineSequence>
-        <ReactiveFallback>
-                <FindCarAvoidancePoint polygons="{polygons}" car_pose="{car_pose}" car_size="{car_size}" free_point="{free_point}" />
-                <SingleTrigger>
-                        <ComputeRightEdgePath polygons="{polygons}" car_pose="{car_pose}" garage_path="{garage_path}" goals="{goals}" state="{state}" />
-                </SingleTrigger>
-                <Subtree ID="ThroughPoses" />
-        </ReactiveFallback>
-        <RecoveryNode number_of_retries="5">
-                <WeltModelNode goal_pose="{free_point}" />
-                <Sequence>
-                        <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
-                        <Wait wait_duration="1" />
-                </Sequence>
-        </RecoveryNode>
-        
-
-    </PipelineSequence>
+  <BehaviorTree ID="MainTree">  
     
-    <RecoveryNode number_of_retries="5" name="NavigateRecovery">
-        <Sequence>
-            <RecoveryNode number_of_retries="5" >
-                <FindCarAvoidancePoint polygons="{polygons}" car_pose="{car_pose}" car_size="{car_size}" free_point="{free_point}" />
-                <Wait wait_duration="1"/>
-            </RecoveryNode>
-            <WeltModelNode goal_pose="{free_point}" />
-            <Wait wait_duration="30"/>
-        </Sequence>
+    <Fallback>
+      
+      <PipelineSequence>
+        <RateController hz="1">
+          <Inverter>
+            <FindCarAvoidancePoint polygons="{polygons}" car_pose="{car_pose}" car_size="{car_size}" free_point="{free_point}" goal="{goal}" state="1" />
+          </Inverter>
+        </RateController>
+        <SingleTrigger>
+          <ComputeRightEdgePath polygons="{polygons}" car_pose="{car_pose}" garage_path="{garage_path}" goals="{goals}" state="3" />
+        </SingleTrigger>
+        <SubTree ID="NavigateThroughPoses" __shared_blackboard="true" />
+      </PipelineSequence>
 
-        <PipeLineSequence>
-          <SingleTrigger>
-              <ComputeRightEdgePath polygons="{polygons}" car_pose="{car_pose}" garage_path="{garage_path}" goals="{goals}" state="{state}" />
-          </SingleTrigger>
-          
-          <PipelineSequence name="NavigateThroughPoses">
-            <RateController hz="0.2">
-              <RecoveryNode number_of_retries="2" name="ComputePathThroughPoses">
-                <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="GridBased"/>
+      <Sequence>
+        <SubTree ID="NavigatoToPose" __shared_blackboard="true" />
+        <WeltModelNode goal_pose="{free_point}" />
+        <Wait wait_duration="15" />
+      </Sequence>      
+      
+    </Fallback>
+  </BehaviorTree>
+
+  <BehaviorTree ID="NavigateThroughPoses">
+    <RecoveryNode number_of_retries="6" name="NavigateRecovery">
+      <PipelineSequence name="NavigateWithReplanning">
+        <RateController hz="10">
+          <RecoveryNode number_of_retries="1" name="ComputePathThroughPoses">
+            <ReactiveSequence>
+              <RemovePassedGoals input_goals="{goals}" output_goals="{goals}" radius="0.7"/>
+              <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="GridBased"/>
+            </ReactiveSequence>
+            <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>
+          </RecoveryNode>
+        </RateController>
+        <RecoveryNode number_of_retries="1" name="FollowPath">
+          <FollowPath path="{path}" controller_id="FollowPath"/>
+          <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
+        </RecoveryNode>
+      </PipelineSequence>
+      <ReactiveFallback name="RecoveryFallback">
+        <GoalUpdated/>
+        <RoundRobin name="RecoveryActions">
+          <Sequence name="ClearingActions">
+            <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
+            <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
+          </Sequence>
+        </RoundRobin>
+      </ReactiveFallback>
+    </RecoveryNode>
+  </BehaviorTree>
+
+  <BehaviorTree ID="NavigatoToPose">
+    <Sequence name="clear_costmap_after_goal_reached">
+      <RecoveryNode number_of_retries="1000000" name="NavigateRecovery">
+        <PipelineSequence name="NavigateWithReplanning">
+            <!-- <GoalUpdatedController>
+              <ClearEntireCostmap name="ClearGlobalCostmap-Subtree"  service_name="global_costmap/clear_entirely_global_costmap"/>
+            </GoalUpdatedController> -->
+            <RateController hz="5.0">
+              <RecoveryNode number_of_retries="10" name="ComputePathToPose">
+                <Sequence>
+                  <ComputePathToPose goal="{free_point}" path="{path}" planner_id="GridBased"/>
+                </Sequence> 
                 <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>
               </RecoveryNode>
             </RateController>
-            <RecoveryNode number_of_retries="1" name="FollowPath">
+          <RecoveryNode number_of_retries="10" name="FollowPath">               
               <FollowPath path="{path}" controller_id="FollowPath"/>
-              <Sequence>
-                <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="GridBased"/>
-                <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
-              </Sequence>
-            </RecoveryNode>
-          </PipelineSequence>
-                               
-        </PipeLineSequence>
-
-    </RecoveryNode>
+              <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
+          </RecoveryNode>
+        </PipelineSequence>
+        <ReactiveFallback name="RecoveryFallback">
+          <GoalUpdated/>
+          <Sequence name="RecoveryActions">
+            <Sequence name="ClearingActions">
+              <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
+              <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
+            </Sequence>
+            <Wait wait_duration="2"/>
+            <!-- <BackUp backup_dist="0.10" backup_speed="0.05"/> -->
+            <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
+            <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
+          </Sequence>
+        </ReactiveFallback>
+      </RecoveryNode>
+      <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
+    </Sequence>
   </BehaviorTree>
+
+
 </root>

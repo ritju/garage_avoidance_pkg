@@ -47,7 +47,7 @@ public:
    */
   bool on_configure(
     rclcpp_lifecycle::LifecycleNode::WeakPtr parent_node,
-    const std::vector<std::string> & plugin_lib_names)
+    const std::vector<std::string> & plugin_lib_names, std::shared_ptr<tf2_ros::Buffer> tf)
   {
     auto node = parent_node.lock();
     logger_ = node->get_logger();
@@ -73,6 +73,7 @@ public:
     }
 
     BT::Blackboard::Ptr blackboard = bt_action_server_->getBlackboard();
+    blackboard->set<std::shared_ptr<tf2_ros::Buffer>>("tf_buffer", tf); 
 
     return configure(parent_node) && ok;
   }

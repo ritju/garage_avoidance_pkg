@@ -34,7 +34,7 @@ void FindCarAvoidancePointAction::on_tick()
   getInput("car_pose", goal_.car_pose);
   getInput("car_size", goal_.car_size);
   // RCLCPP_INFO(node_->get_logger(), "on tick set state %d", garage_utils_msgs::msg::State::GENERATE_PATH);
-  setOutput("state", garage_utils_msgs::msg::State::GENERATE_PATH);
+  setOutput("state", garage_utils_msgs::msg::State::SEARCHING_PARKING_SPACE);
 
   // just for test
   // double rects_[][4][2] = {
@@ -75,6 +75,7 @@ void FindCarAvoidancePointAction::on_tick()
 BT::NodeStatus FindCarAvoidancePointAction::on_success()
 {
   setOutput("free_point", result_.result->pose);
+  setOutput("goal", result_.result->pose);
   return BT::NodeStatus::SUCCESS;
 }
 
@@ -82,8 +83,7 @@ BT::NodeStatus FindCarAvoidancePointAction::on_aborted()
 {
   geometry_msgs::msg::PoseStamped empty_pose;
   setOutput("free_point", empty_pose);
-  std::vector<geometry_msgs::msg::PoseStamped> empty_poses;
-  setOutput("goals", empty_poses);
+  setOutput("goal", empty_pose);
   return BT::NodeStatus::FAILURE;
 }
 
@@ -91,8 +91,7 @@ BT::NodeStatus FindCarAvoidancePointAction::on_cancelled()
 {
   geometry_msgs::msg::PoseStamped empty_pose;
   setOutput("free_point", empty_pose);
-  std::vector<geometry_msgs::msg::PoseStamped> empty_poses;
-  setOutput("goals", empty_poses);
+  setOutput("goal", empty_pose);
   return BT::NodeStatus::SUCCESS;
 }
 
@@ -100,8 +99,7 @@ void FindCarAvoidancePointAction::halt()
 {
   geometry_msgs::msg::PoseStamped empty_pose;
   setOutput("free_point", empty_pose);
-  std::vector<geometry_msgs::msg::PoseStamped> empty_poses;
-  setOutput("goals", empty_poses);
+  setOutput("goal", empty_pose);
   BtActionNode::halt();
 }
 

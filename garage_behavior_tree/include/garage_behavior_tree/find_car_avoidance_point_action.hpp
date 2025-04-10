@@ -69,7 +69,8 @@ public:
         BT::InputPort<geometry_msgs::msg::PoseStamped>("car_pose", "the pose of car"),
         BT::InputPort<geometry_msgs::msg::Vector3>("car_size", "the size of car"),
         BT::OutputPort<uint8_t>("state", "behavior tree state"),        
-        BT::OutputPort<geometry_msgs::msg::PoseStamped>("free_point", "the pose for car parking."),
+        BT::OutputPort<geometry_msgs::msg::PoseStamped>("free_point", "the pose for robot parking."),
+        BT::OutputPort<geometry_msgs::msg::PoseStamped>("goal", "the pose for robot to navigating"),
         
       });
   }

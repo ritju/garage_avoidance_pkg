@@ -43,6 +43,12 @@ BtNavigator::on_configure(const rclcpp_lifecycle::State & /*state*/)
 {
   RCLCPP_INFO(get_logger(), "Configuring");
 
+  tf_ = std::make_shared<tf2_ros::Buffer>(get_clock());
+  auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(
+    get_node_base_interface(), get_node_timers_interface());
+  tf_->setCreateTimerInterface(timer_interface);
+  tf_->setUsingDedicatedThread(true);
+  tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_, this, false);
 
   // Libraries to pull plugins (BT Nodes) from
   auto plugin_lib_names = get_parameter("plugin_lib_names").as_string_array();
@@ -51,7 +57,7 @@ BtNavigator::on_configure(const rclcpp_lifecycle::State & /*state*/)
 
 
   if (!garage_navigator_->on_configure(
-      shared_from_this(), plugin_lib_names))
+      shared_from_this(), plugin_lib_names, tf_))
   {
     return nav2_util::CallbackReturn::FAILURE;
   }

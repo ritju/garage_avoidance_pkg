@@ -23,36 +23,32 @@
         </RecoveryNode>
       </PipelineSequence> -->
 
-      <!-- <RecoveryNode number_of_retries="12" name="NavigateRecovery">
-      <Sequence name="NavigateWithReplanning">
-        <RateController hz="10.0">
-          <ReactiveSequence>
-            <RemovePassedGoals input_goals="{goals}" output_goals="{goals}" radius="1.0"/>
-          </ReactiveSequence>
-        </RateController>
-        <SingleTrigger>
-          <RecoveryNode number_of_retries="2" name="ComputePathThroughPoses">
-            <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="GridBased"/>
+      <RecoveryNode number_of_retries="6" name="NavigateRecovery">
+      <PipelineSequence name="NavigateWithReplanning">
+        <RateController hz="10">
+          <RecoveryNode number_of_retries="1" name="ComputePathThroughPoses">
+            <ReactiveSequence>
+              <RemovePassedGoals input_goals="{goals}" output_goals="{goals}" radius="0.7"/>
+              <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="GridBased"/>
+            </ReactiveSequence>
             <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>
           </RecoveryNode>
-        </SingleTrigger>
+        </RateController>
         <RecoveryNode number_of_retries="1" name="FollowPath">
           <FollowPath path="{path}" controller_id="FollowPath"/>
-          <Sequence>
-            <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="GridBased"/>
-          </Sequence>
+          <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
         </RecoveryNode>
-      </Sequence>
+      </PipelineSequence>
       <ReactiveFallback name="RecoveryFallback">
         <GoalUpdated/>
         <RoundRobin name="RecoveryActions">
           <Sequence name="ClearingActions">
-            <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>
+            <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
+            <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
           </Sequence>
-          <Wait wait_duration="5"/>
         </RoundRobin>
       </ReactiveFallback>
-    </RecoveryNode> -->
+    </RecoveryNode>
 
     </Sequence>
                                
