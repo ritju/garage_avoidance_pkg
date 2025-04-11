@@ -15,6 +15,7 @@ find_package(nav2_behavior_tree REQUIRED)
 find_package(garage_behavior_tree REQUIRED)
 find_package(garage_utils_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 nav2_package()
 
@@ -45,6 +46,7 @@ set(dependencies
   nav2_behavior_tree
   garage_behavior_tree
   tf2_ros
+  visualization_msgs
 )
 
 add_library(${library_name} SHARED

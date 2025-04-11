@@ -30,7 +30,7 @@ namespace garage_utils_pkg
                for (size_t i = 0; i < points.size() - 1; i++)
                {
                     RCLCPP_INFO(node_->get_logger(), "");
-                    RCLCPP_INFO(node_->get_logger(), "%zd/%zd", i, points.size()-2);
+                    RCLCPP_INFO(node_->get_logger(), "segment %zd->%zd", i, points.size()-2);
                     auto pt1 = points[i];
                     auto pt2 = points[i + 1];
                     int index = find_polygon_index(pt1, pt2, polygons);
@@ -60,7 +60,7 @@ namespace garage_utils_pkg
                         double distance_add = 0.0;
                         Point pt = path_start;
 
-                        //       RCLCPP_INFO(node_->get_logger(), "***** path *****");
+                              RCLCPP_INFO(node_->get_logger(), "***** path *****");
                         while (distance_add <= length)
                         {
                                 geometry_msgs::msg::PoseStamped pose;
@@ -71,7 +71,7 @@ namespace garage_utils_pkg
                                 pose.pose.position.x = x;
                                 pose.pose.position.y = y;
                                 path.poses.push_back(pose);
-                                // RCLCPP_INFO(node_->get_logger(), "pose: (%f, %f)", x, y);
+                                RCLCPP_INFO(node_->get_logger(), "pose: (%f, %f)", x, y);
 
                                 pt.first +=  unit_x * this->resolution_;
                                 pt.second += unit_y * this->resolution_; 

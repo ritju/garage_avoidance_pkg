@@ -519,7 +519,7 @@ namespace garage_utils_pkg
                         RCLCPP_INFO(node_->get_logger(), "NeighborType: POINT_POINT");
                         RCLCPP_INFO(node_->get_logger(), "another intersection point: (%.1f, %.1f)", pt_intersection_2.first, pt_intersection_2.second);
                 }
-                else if (dis_pt_pt2 == dis_min)
+                else if (dis_pt_pt2 == dis_min || dis_pt_pt2 < dis_thr_)
                 {
                         intersection_type = NeighborType::POINT_POINT;
                         pt_intersection_2 = edge_intersection.pt2;

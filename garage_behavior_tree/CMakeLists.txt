@@ -62,6 +62,9 @@ list(APPEND plugin_libs find_car_avoidance_point_action)
 add_library(welt_model_node SHARED src/welt_model_node.cpp)
 list(APPEND plugin_libs welt_model_node)
 
+# add_library(is_car_moving SHARED src/is_car_moving.cpp)
+# list(APPEND plugin_libs is_car_moving)
+
 foreach(bt_plugin ${plugin_libs})
   ament_target_dependencies(${bt_plugin} ${dependencies})
   target_compile_definitions(${bt_plugin} PRIVATE BT_PLUGIN_EXPORT)

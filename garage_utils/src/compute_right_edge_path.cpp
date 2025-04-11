@@ -260,6 +260,17 @@ namespace garage_utils_pkg
 
                         RCLCPP_INFO(get_logger(), "p3_selected: (%f, %f)", p3_selected.first, p3_selected.second);
                         RCLCPP_INFO(get_logger(), "p4_selected: (%f, %f)", p4_selected.first, p4_selected.second);
+
+                        // bug fix p1==p3 || p2==p4
+                        if (p1_selected == p3_selected || p2_selected == p4_selected)
+                        {
+                                result->success = false;
+                                result->path = nav_msgs::msg::Path();
+                                result->poses = this->path_.poses;
+                                goal_handle->abort(result);
+                                RCLCPP_INFO(get_logger(), "Goal Failed, fix p1==p3 || p2==p4");
+                                return;
+                        }
                         
                         // 更新 polygon_first
                         polygon_first.points.clear();
@@ -369,7 +380,16 @@ namespace garage_utils_pkg
                         this->path_ = path_generator_->get_path();
 
                         // 4、publish path
-                        this->path_pub_->publish(this->path_);                         
+                        this->path_pub_->publish(this->path_);
+
+                        RCLCPP_INFO(get_logger(), "----- print path's poses -----");
+                        for (size_t i = 0; i < this->path_.poses.size(); i++)
+                        {
+                                RCLCPP_INFO(get_logger(), "poses: (%.1f, %.1f)",
+                                        this->path_.poses[i].pose.position.x,
+                                        this->path_.poses[i].pose.position.y);
+                        }
+                                                 
                         
                         if (rclcpp::ok())
                         {

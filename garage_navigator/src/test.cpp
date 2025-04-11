@@ -3,6 +3,8 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 
+#include "visualization_msgs/msg/marker_array.hpp"
+
 
 // double rects_[][4][2] = {
 //         {{1.0, 0.0}, {1.0, 20.0}, {-1.0, 20.0}, {-1.0, 0.0}},
@@ -23,9 +25,13 @@ int number = 2;
 double car_coord[2] = {3.0 , -7.0};   // car的 x,y 坐标
 double car_size[3] = {1.0, 0.5, 1.0}; // car的size
 
+rclcpp_action::ClientGoalHandle<garage_utils_msgs::action::GarageVehicleAvoidance>::SharedPtr goal_handle_;
+
 void goal_response_callback(const rclcpp_action::ClientGoalHandle<garage_utils_msgs::action::GarageVehicleAvoidance>::SharedPtr& goal_handle)
 {
-        if (!goal_handle) 
+        std::cout << "goal response callback" << std::endl;
+        goal_handle_ = goal_handle;
+        if (!goal_handle_) 
         {
                 std::cout << "Goal was rejected by server" << std::endl;
         } 
@@ -38,7 +44,9 @@ void goal_response_callback(const rclcpp_action::ClientGoalHandle<garage_utils_m
 void feedback_callback(rclcpp_action::ClientGoalHandle<garage_utils_msgs::action::GarageVehicleAvoidance>::SharedPtr goal_handle, const std::shared_ptr<const garage_utils_msgs::action::GarageVehicleAvoidance::Feedback> feedback)
 {
         (void)goal_handle;
-        std::cout << "state " << (int)feedback->state << std::endl;
+
+        (void)feedback;
+        // std::cout << "state " << (int)feedback->state << std::endl;
 }
 
 void result_callback(const rclcpp_action::ClientGoalHandle<garage_utils_msgs::action::GarageVehicleAvoidance>::WrappedResult& result)
@@ -71,6 +79,45 @@ int main(int argc, char** argv)
 
         // define node
         auto node = std::make_shared<rclcpp::Node>("action_client");
+
+        // show rects in rviz2 by visualization_msgs
+        auto rects_pub = node->create_publisher<visualization_msgs::msg::Marker>("rects_visualization", rclcpp::QoS(5).reliable().transient_local());
+        visualization_msgs::msg::Marker msg;
+        msg.header.frame_id = "map";
+        msg.header.stamp = node->now();
+        msg.ns = "test";
+        msg.id = 0;
+        msg.type = visualization_msgs::msg::Marker::LINE_LIST;
+        msg.action = 0;
+        msg.scale.x = 0.1;
+        msg.color.r = 0.0;
+        msg.color.g = 0.0;
+        msg.color.b = 1.0;
+        msg.color.a = 1.0;
+        for (int i = 0; i < number; i++)
+        {                
+                for (int j = 0; j < 4; j++)
+                {
+                        geometry_msgs::msg::Point p_start;
+                        p_start.x = rects_[i][j][0];
+                        p_start.y = rects_[i][j][1];
+                        p_start.z = 0.0;
+                        msg.points.push_back(p_start);
+                        geometry_msgs::msg::Point p_end;
+                        p_end.x = rects_[i][(j+1)%4][0];
+                        p_end.y = rects_[i][(j+1)%4][1];
+                        p_end.z = 0.0;
+                        msg.points.push_back(p_end);
+                }
+        }
+        // for (int i = 0; i < 5; i++)
+        // {
+        //         RCLCPP_INFO(node->get_logger(), "publish rects visualization.");
+                rects_pub->publish(msg);
+        //         std::this_thread::sleep_for(std::chrono::seconds(1));
+        // }
+        
+        
 
         geometry_msgs::msg::PoseStamped car_pose;
         car_pose.header.frame_id = "map";
@@ -120,9 +167,27 @@ int main(int argc, char** argv)
         send_goal_options.result_callback = result_callback;
         send_goal_options.feedback_callback = feedback_callback;
 
-        client_ptr_->async_send_goal(goal_msg, send_goal_options);        
+        auto future = client_ptr_->async_send_goal(goal_msg, send_goal_options);
+
+        // test for cancel goal
+        std::thread([&](){
+                std::this_thread::sleep_for(std::chrono::seconds(3));
+                if (goal_handle_)
+                {
+                        RCLCPP_INFO(node->get_logger(), "cancel the goal.");
+                        auto cancel_future = client_ptr_->async_cancel_goal(goal_handle_);
+                        cancel_future.wait();
+                        RCLCPP_INFO(node->get_logger(), "cancel goal completed.");
+                }
+                else
+                {
+                        RCLCPP_INFO(node->get_logger(), "goal_handle is empty ptr, failed to cancel goal."); 
+                }   
+                }).detach();
         
-        
-        rclcpp::spin(node);
+        rclcpp::executors::MultiThreadedExecutor executor;
+        executor.add_node(node);
+        executor.spin();
+        // rclcpp::spin(node);
         rclcpp::shutdown();
 }
