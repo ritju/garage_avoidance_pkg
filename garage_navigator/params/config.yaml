@@ -1,7 +1,7 @@
 bt_garage_navigator:
   ros__parameters:
     use_sim: false
-    default_nav_to_pose_bt_xml: /workspaces/capella_ros_docker/install/share/garage_navigator/behavior_trees/garage3.xml
+    default_nav_to_pose_bt_xml: /workspaces/capella_ros_docker/install/share/garage_navigator/behavior_trees/garage2.xml
     plugin_lib_names:
       - "compute_right_edge_path_action"
       - "find_car_avoidance_point_action"

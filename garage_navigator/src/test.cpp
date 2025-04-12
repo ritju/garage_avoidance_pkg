@@ -1,9 +1,11 @@
 #include "garage_utils_msgs/action/garage_vehicle_avoidance.hpp"
+#include "garage_utils_msgs/msg/state.hpp"
 
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 
 #include "visualization_msgs/msg/marker_array.hpp"
+#include <map>
 
 
 // double rects_[][4][2] = {
@@ -25,6 +27,13 @@ int number = 2;
 double car_coord[2] = {3.0 , -7.0};   // car的 x,y 坐标
 double car_size[3] = {1.0, 0.5, 1.0}; // car的size
 
+bool test_cancel = false;
+
+uint8_t state_current = garage_utils_msgs::msg::State::INIT;
+uint8_t state_last    = garage_utils_msgs::msg::State::INIT;
+
+std::map<uint8_t, std::string> state_map;
+
 rclcpp_action::ClientGoalHandle<garage_utils_msgs::action::GarageVehicleAvoidance>::SharedPtr goal_handle_;
 
 void goal_response_callback(const rclcpp_action::ClientGoalHandle<garage_utils_msgs::action::GarageVehicleAvoidance>::SharedPtr& goal_handle)
@@ -45,8 +54,15 @@ void feedback_callback(rclcpp_action::ClientGoalHandle<garage_utils_msgs::action
 {
         (void)goal_handle;
 
-        (void)feedback;
+        // (void)feedback;
         // std::cout << "state " << (int)feedback->state << std::endl;
+        state_current = feedback->state;
+        if (state_current != state_last)
+        {
+                std::cout << "change state from " << state_map[state_last] << " to " << state_map[state_current] << std::endl;;
+                state_last = state_current;
+        }
+        
 }
 
 void result_callback(const rclcpp_action::ClientGoalHandle<garage_utils_msgs::action::GarageVehicleAvoidance>::WrappedResult& result)
@@ -79,6 +95,15 @@ int main(int argc, char** argv)
 
         // define node
         auto node = std::make_shared<rclcpp::Node>("action_client");
+
+        // generate map from uint8_t to string for states
+        state_map[garage_utils_msgs::msg::State::INIT] = "INIT";
+        state_map[garage_utils_msgs::msg::State::SEARCHING_PARKING_SPACE] = "SEARCHING_PARKING_SPACE";
+        state_map[garage_utils_msgs::msg::State::GENERATE_PATH] = "GENERATE_PATH";
+        state_map[garage_utils_msgs::msg::State::WELT] = "WELT";
+        state_map[garage_utils_msgs::msg::State::NAVIGATE_TO_POSE] = "NAVIGATE_TO_POSE";
+        state_map[garage_utils_msgs::msg::State::NAVIGATE_THROUGH_POSES] = "NAVIGATE_THROUGH_POSES";
+        state_map[garage_utils_msgs::msg::State::WAITING] = "WAITING";
 
         // show rects in rviz2 by visualization_msgs
         auto rects_pub = node->create_publisher<visualization_msgs::msg::Marker>("rects_visualization", rclcpp::QoS(5).reliable().transient_local());
@@ -170,20 +195,23 @@ int main(int argc, char** argv)
         auto future = client_ptr_->async_send_goal(goal_msg, send_goal_options);
 
         // test for cancel goal
-        std::thread([&](){
-                std::this_thread::sleep_for(std::chrono::seconds(3));
-                if (goal_handle_)
-                {
-                        RCLCPP_INFO(node->get_logger(), "cancel the goal.");
-                        auto cancel_future = client_ptr_->async_cancel_goal(goal_handle_);
-                        cancel_future.wait();
-                        RCLCPP_INFO(node->get_logger(), "cancel goal completed.");
-                }
-                else
-                {
-                        RCLCPP_INFO(node->get_logger(), "goal_handle is empty ptr, failed to cancel goal."); 
-                }   
-                }).detach();
+        if (test_cancel)
+        {
+                std::thread([&](){
+                        std::this_thread::sleep_for(std::chrono::seconds(3));
+                        if (goal_handle_)
+                        {
+                                RCLCPP_INFO(node->get_logger(), "cancel the goal.");
+                                auto cancel_future = client_ptr_->async_cancel_goal(goal_handle_);
+                                cancel_future.wait();
+                                RCLCPP_INFO(node->get_logger(), "cancel goal completed.");
+                        }
+                        else
+                        {
+                                RCLCPP_INFO(node->get_logger(), "goal_handle is empty ptr, failed to cancel goal."); 
+                        }   
+                        }).detach();
+        }
         
         rclcpp::executors::MultiThreadedExecutor executor;
         executor.add_node(node);

@@ -6,18 +6,18 @@
       <PipelineSequence>
         <RateController hz="1">
           <Inverter>
-            <FindCarAvoidancePoint polygons="{polygons}" car_pose="{car_pose}" car_size="{car_size}" free_point="{free_point}" goal="{goal}" state="1" />
+            <FindCarAvoidancePoint polygons="{polygons}" car_pose="{car_pose}" car_size="{car_size}" free_point="{free_point}" goal="{goal}" state="{state}" />
           </Inverter>
         </RateController>
         <SingleTrigger>
-          <ComputeRightEdgePath polygons="{polygons}" car_pose="{car_pose}" garage_path="{garage_path}" goals="{goals}" state="3" />
+          <ComputeRightEdgePath polygons="{polygons}" car_pose="{car_pose}" garage_path="{garage_path}" goals="{goals}" state="{state}" />
         </SingleTrigger>
         <SubTree ID="NavigateThroughPoses" __shared_blackboard="true" />
       </PipelineSequence>
 
       <Sequence>
         <SubTree ID="NavigatoToPose" __shared_blackboard="true" />
-        <WeltModelNode goal_pose="{free_point}" />
+        <WeltModelNode goal_pose="{free_point}" state="{state}" />
         <Wait wait_duration="15" />
       </Sequence>      
       

@@ -30,7 +30,7 @@ def generate_launch_description():
     use_respawn = LaunchConfiguration('use_respawn')
     log_level = LaunchConfiguration('log_level')
 
-    lifecycle_nodes = ['bt_garage_navigator', "robot_avoidance"]
+    lifecycle_nodes = ['bt_garage_navigator', 'robot_avoidance_node']
 
     # Map fully qualified names to relative ones so the node's namespace can be prepended.
     # In case of the transforms (tf), currently, there doesn't seem to be a better alternative
@@ -93,6 +93,17 @@ def generate_launch_description():
     load_nodes = GroupAction(
         condition=IfCondition(PythonExpression(['not ', use_composition])),
         actions=[
+            
+            Node(
+                package='robot_avoidance',
+                executable='robot_avoidance',
+                name='robot_avoidance_node',
+                output='screen',
+                respawn=use_respawn,
+                respawn_delay=2.0,
+                parameters=[nav2_param_file],
+                arguments=['--ros-args', '--log-level', log_level],
+                remappings=remappings),
             Node(
                 package='garage_navigator',
                 executable='bt_garage_navigator',
@@ -104,19 +115,9 @@ def generate_launch_description():
                 arguments=['--ros-args', '--log-level', log_level],
                 remappings=remappings),
             Node(
-                package='robot_avoidance',
-                executable='robot_avoidance',
-                name='robot_avoidance',
-                output='screen',
-                respawn=use_respawn,
-                respawn_delay=2.0,
-                parameters=[nav2_param_file],
-                arguments=['--ros-args', '--log-level', log_level],
-                remappings=remappings),
-            Node(
                 package='nav2_lifecycle_manager',
                 executable='lifecycle_manager',
-                name='lifecycle_manager_navigation',
+                name='lifecycle_manager_garage_avoidance',
                 output='screen',
                 arguments=['--ros-args', '--log-level', log_level],
                 parameters=[{'use_sim_time': use_sim_time},

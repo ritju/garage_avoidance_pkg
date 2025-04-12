@@ -31,6 +31,7 @@ WeltModelNode::WeltModelNode(
 void WeltModelNode::on_tick()
 {
   getInput("goal_pose", goal_.goal_pose);
+  setOutput("state", garage_utils_msgs::msg::State::WELT);
 }
 
 }  // namespace nav2_behavior_tree

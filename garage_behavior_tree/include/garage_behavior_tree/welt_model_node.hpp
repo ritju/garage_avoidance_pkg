@@ -6,6 +6,7 @@
 
 #include "garage_behavior_tree/bt_action_node.hpp"
 #include "capella_ros_msg/action/welt.hpp"
+#include "garage_utils_msgs/msg/state.hpp"
 
 namespace garage_utils_pkg
 {
@@ -37,6 +38,7 @@ public:
     return providedBasicPorts(
       {
         BT::InputPort<geometry_msgs::msg::PoseStamped>("goal_pose", "welt to goal pose"),
+        BT::OutputPort<uint8_t>("state", "current state of behavior_tree."),
       });
   }
 
