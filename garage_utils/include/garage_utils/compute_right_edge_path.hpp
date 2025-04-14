@@ -38,7 +38,7 @@ public:
   explicit ComputeRightEdgePathActionServer(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
   ~ComputeRightEdgePathActionServer();
 
-  size_t get_current_polygon_index(tf2::Transform robot_pose, std::vector<geometry_msgs::msg::Polygon> polygons);
+  size_t get_current_polygon_index(double x, double y, std::vector<geometry_msgs::msg::Polygon> polygons);
   bool get_map_robot_tf();
   
     // 检查goal的合法性
@@ -209,7 +209,9 @@ private:
   // params
   std::string path_topic_name_;
   double dis_thr_;
-  
+  bool test{false};
+  double robot_x_test;
+  double robot_y_test;  
 
 };  // class ComputeRightEdgePathActionServer
 

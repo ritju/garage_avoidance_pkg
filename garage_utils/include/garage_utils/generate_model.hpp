@@ -18,6 +18,9 @@ public:
 
         void process_(const std::vector<std::vector<Point>>& rects, double dis_thr);
 
+        void set_robot_and_car_pose(const double& robot_x, const double& robot_y, const double& car_x, const double& car_y);
+        int get_nearest_edge_index(double x, double y, std::vector<Edge> edges);
+
         void check_rects(std::vector<std::vector<Point>> rects);
         void print_rects(const std::vector<std::vector<Point>>& rects);
         void print_enhanced_rects(const std::vector<EnhancedRect>& rects);
@@ -82,7 +85,11 @@ private:
         rclcpp::Node::SharedPtr            node_;
         int                                index;      // 生成points时的索引值。
         double                             dis_thr_;
-        
+
+        double car_pose_x_;
+        double car_pose_y_;
+        double robot_pose_x_;
+        double robot_pose_y_;        
 };
 
 } // end of namespace

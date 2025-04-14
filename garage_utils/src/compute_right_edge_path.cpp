@@ -40,13 +40,22 @@ namespace garage_utils_pkg
                 this->declare_parameter<std::string>("path_topic_name", "garage_path");
                 this->declare_parameter<double>("dis_thr", 2.5);
                 this->declare_parameter<double>("resolution", 2.0);
+                this->declare_parameter<bool>("test", false);
+                this->declare_parameter<double>("robot_x_test", 0.0);
+                this->declare_parameter<double>("robot_y_test", 3.5);
 
                 this->dis_thr_ = this->get_parameter_or("dis_thr", 2.5);
                 this->path_topic_name_ = this->get_parameter_or("path_topic_name", std::string("garage_path"));
+                this->test = this->get_parameter_or("test", false);
+                this->robot_x_test = this->get_parameter_or("robot_x_test", 0.0);
+                this->robot_y_test = this->get_parameter_or("robot_y_test", 3.5);
 
-                RCLCPP_DEBUG(get_logger(), "------------ list params ------------ ");
-                RCLCPP_DEBUG(get_logger(), "dist_thr: %f", this->dis_thr_);
-                RCLCPP_DEBUG(get_logger(), "path_topic_name: %s", this->path_topic_name_.c_str());
+                RCLCPP_INFO(get_logger(), "------------ list params ------------ ");
+                RCLCPP_INFO(get_logger(), "dist_thr: %f", this->dis_thr_);
+                RCLCPP_INFO(get_logger(), "path_topic_name: %s", this->path_topic_name_.c_str());
+                RCLCPP_INFO(get_logger(), "robot_x_test: %f", robot_x_test);
+                RCLCPP_INFO(get_logger(), "robot_y_test: %f", robot_y_test);
+                RCLCPP_INFO(get_logger(), "test: %s", test?"true":"false");
         }
 
         void ComputeRightEdgePathActionServer::print_polygons(const std::vector<geometry_msgs::msg::Polygon> polygons)
@@ -160,13 +169,16 @@ namespace garage_utils_pkg
                         car_x = goal->car_pose.pose.position.x;
                         car_y = goal->car_pose.pose.position.y;
 
-                        // tmp, !!!!!!!!!!!!!!! delete atfer test !!!!!!!!!!!!!!
-                        // robot_x = 0.0;
-                        // robot_y = 3.0;
+                        // test
+                        if (this->test)
+                        {
+                                robot_x = robot_x_test;
+                                robot_y = robot_y_test;
+                        }
                         
                         RCLCPP_INFO(get_logger(), "robot_pose: (%f, %f)", robot_x, robot_y);
 
-                        size_t current_index = get_current_polygon_index(map_robot_tf, polygons_);
+                        size_t current_index = get_current_polygon_index(robot_x, robot_y, polygons_);
                         RCLCPP_INFO(get_logger(), "current_index: %ld", current_index);
                         auto polygon_first = this->polygons_[current_index];                
                         this->polygons_.erase(polygons_.begin() + current_index);
@@ -314,6 +326,7 @@ namespace garage_utils_pkg
                         }
 
                         model_generator_->print_rects(rects);
+                        model_generator_->set_robot_and_car_pose(robot_x, robot_y, car_x, car_y);
                         model_generator_->process_(rects, dis_thr_);
                         auto points = model_generator_->get_points();
 
@@ -508,16 +521,11 @@ namespace garage_utils_pkg
                 }
         }
 
-        size_t ComputeRightEdgePathActionServer::get_current_polygon_index(tf2::Transform robot_pose, std::vector<geometry_msgs::msg::Polygon> polygons)
+        size_t ComputeRightEdgePathActionServer::get_current_polygon_index(double x, double y, std::vector<geometry_msgs::msg::Polygon> polygons)
         {
-                double robot_x, robot_y; 
-                robot_x = robot_pose.getOrigin().getX();
-                robot_y = robot_pose.getOrigin().getY();
-
                 for (size_t i = 0; i < polygons_.size(); i++)
                 {
                         auto polygon = polygons[i];
-                        auto points_size = polygon.points.size();
                         std::vector<std::pair<double, double>> polygon_segment_vec;
                         for (size_t j = 0; j < polygon.points.size(); j++)
                         {
@@ -527,7 +535,7 @@ namespace garage_utils_pkg
                                 segment.second = point.y;
                                 polygon_segment_vec.push_back(segment);
                         }
-                        if (isPointInPolygon(robot_x, robot_y, polygon_segment_vec))
+                        if (isPointInPolygon(x, y, polygon_segment_vec))
                         {
                                 return i;
                         }
@@ -548,7 +556,7 @@ namespace garage_utils_pkg
                         {
                                 auto point1 = polygon.points[j];
                                 auto point2 = polygon.points[(j+1)%(polygon.points.size())];
-                                double distance = point_to_line_distance_smart(robot_x, robot_y, point1.x, point1.y, point2.x, point2.y);
+                                double distance = point_to_line_distance_smart(x, y, point1.x, point1.y, point2.x, point2.y);
                                 if (distance < distance_side_min)
                                 {
                                         distance_side_min = distance;
@@ -580,7 +588,6 @@ namespace garage_utils_pkg
                 if (polygon.size() < 3) return false;
 
                 bool result = false;
-                const double infinity = std::numeric_limits<double>::max();
                 int n = polygon.size();
 
                 for (int i = 0; i < n; ++i) 

@@ -17,7 +17,7 @@ double rects_[][4][2] = {
 };
 int number = 6;
 
-double car_coord[2] = {0.0 , 2.0};  // car的 x,y 坐标
+// double car_coord[2] = {0.0 , 2.0};  // car的 x,y 坐标
 
 void goal_response_callback(const rclcpp_action::ClientGoalHandle<garage_utils_msgs::action::ComputeRightEdgePath>::SharedPtr& goal_handle)
 {
@@ -68,12 +68,19 @@ int main(int argc, char **argv)
         rclcpp::init(argc, argv);
 
         // define node
-        auto node = std::make_shared<rclcpp::Node>("action_client");
+        auto node = std::make_shared<rclcpp::Node>("test_compute_right_edge_path");
+        
+        node->declare_parameter<double>("car_pose_x", 0.0);
+        node->declare_parameter<double>("car_pose_y", 2.0);
+
+        double car_pose_x, car_pose_y;
+        car_pose_x = node->get_parameter_or<double>("car_pose_x", 0.0);
+        car_pose_y = node->get_parameter_or<double>("car_pose_y", 2.0);
 
         geometry_msgs::msg::PoseStamped car_pose;
         car_pose.header.frame_id = "map";
-        car_pose.pose.position.x = car_coord[0];
-        car_pose.pose.position.y = car_coord[1];
+        car_pose.pose.position.x = car_pose_x;
+        car_pose.pose.position.y = car_pose_y;
         
         std::vector<geometry_msgs::msg::Polygon> polygons;
         for (int i = 0; i < number; i++)
