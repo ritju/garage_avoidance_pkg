@@ -5,12 +5,12 @@ namespace garage_utils_pkg
         ShortestPathSearch::ShortestPathSearch(rclcpp::Node::SharedPtr node)
         {
                 this->node_ = node;
-                RCLCPP_INFO(node_->get_logger(), "ShortestPathSearch constructor."); 
+                RCLCPP_INFO(node_->get_logger(), " [shortest_path_search] ShortestPathSearch constructor."); 
         }
 
         ShortestPathSearch::~ShortestPathSearch()
         {
-             RCLCPP_INFO(node_->get_logger(), "ShortestPathSearch destructor.");   
+             RCLCPP_INFO(node_->get_logger(), " [shortest_path_search] ShortestPathSearch destructor.");   
         }
 
         void ShortestPathSearch::process_(const std::vector<EnhancedPoint>& points, const int& start_index)
@@ -110,8 +110,8 @@ namespace garage_utils_pkg
                 index_parent = get_points_index(points, parent);
                 index_current = get_points_index(points, current);
 
-                RCLCPP_INFO(node_->get_logger(), "");
-                RCLCPP_INFO(node_->get_logger(), "=== get_sub_path(%d, %d) ===", parent, current);
+                RCLCPP_INFO(node_->get_logger(), " [shortest_path_search] ");
+                RCLCPP_INFO(node_->get_logger(), " [shortest_path_search] === get_sub_path(%d, %d) ===", parent, current);
                 pre_[current] = parent;
                 std::priority_queue<std::pair<double, std::vector<int>>, 
                         std::vector<std::pair<double, std::vector<int>>>, 
@@ -142,10 +142,10 @@ namespace garage_utils_pkg
                 // 3、递归处理子结点
                 for (int child : points[index_current].adjacent_vec)
                 {
-                        RCLCPP_INFO(node_->get_logger(), "");
-                        RCLCPP_INFO(node_->get_logger(), "parent : %d", parent);
-                        RCLCPP_INFO(node_->get_logger(), "current: %d", current);
-                        RCLCPP_INFO(node_->get_logger(), "child  : %d", child);
+                        RCLCPP_INFO(node_->get_logger(), " [shortest_path_search] ");
+                        RCLCPP_INFO(node_->get_logger(), " [shortest_path_search] parent : %d", parent);
+                        RCLCPP_INFO(node_->get_logger(), " [shortest_path_search] current: %d", current);
+                        RCLCPP_INFO(node_->get_logger(), " [shortest_path_search] child  : %d", child);
 
                         double child_dis = 0.0;
                         std::vector<int> child_path;
@@ -154,13 +154,13 @@ namespace garage_utils_pkg
                         {
                                 if (points[index_current].adjacent_vec.size() > 1) // adjacent_vec.size() > 1, 跳过子节点是父节点的子节点。
                                 {
-                                        RCLCPP_INFO(node_->get_logger(), "child of current is parent, continue");
+                                        RCLCPP_INFO(node_->get_logger(), " [shortest_path_search] child of current is parent, continue");
                                         continue;
                                 }
                                 else  // 这是一个叶节点
                                 {
                                         is_leaf = true;
-                                        RCLCPP_INFO(node_->get_logger(), "leaf: %d", current);
+                                        RCLCPP_INFO(node_->get_logger(), " [shortest_path_search] leaf: %d", current);
                                         int child = points[index_current].adjacent_vec[0];
                                         index_child = get_points_index(points, child);
 
@@ -217,10 +217,10 @@ namespace garage_utils_pkg
                 {
                         ss << path[i] << " ";
                 }
-                RCLCPP_INFO(node_->get_logger(), "*** get_sub_path(%d, %d) ***", parent, current);
-                RCLCPP_INFO(node_->get_logger(), "distance record: %s", ss_record_distance.str().c_str());
-                RCLCPP_INFO(node_->get_logger(), "distance: %.3f", distance);
-                RCLCPP_INFO(node_->get_logger(), "path    : [ %s]", ss.str().c_str());
+                RCLCPP_INFO(node_->get_logger(), " [shortest_path_search] *** get_sub_path(%d, %d) ***", parent, current);
+                RCLCPP_INFO(node_->get_logger(), " [shortest_path_search] distance record: %s", ss_record_distance.str().c_str());
+                RCLCPP_INFO(node_->get_logger(), " [shortest_path_search] distance: %.3f", distance);
+                RCLCPP_INFO(node_->get_logger(), " [shortest_path_search] path    : [ %s]", ss.str().c_str());
         }
 
         int ShortestPathSearch::get_points_index(const std::vector<EnhancedPoint> points, int index)
@@ -267,10 +267,10 @@ namespace garage_utils_pkg
                                         pre = current;
 
                                         int current_index = get_points_index(points, current);
-                                        // RCLCPP_INFO(node_->get_logger(), "current : %d", current);
-                                        // RCLCPP_INFO(node_->get_logger(), "pre mask: %d", mask);
+                                        // RCLCPP_INFO(node_->get_logger(), " [shortest_path_search] current : %d", current);
+                                        // RCLCPP_INFO(node_->get_logger(), " [shortest_path_search] pre mask: %d", mask);
                                         mask |= 1 << current_index;
-                                        // RCLCPP_INFO(node_->get_logger(), "suf mask: %d", mask);                     
+                                        // RCLCPP_INFO(node_->get_logger(), " [shortest_path_search] suf mask: %d", mask);                     
                                 }
                         }
 
