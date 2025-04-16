@@ -121,3 +121,9 @@ robot_avoidance_node:
         do_refinement: true
         refinement_num: 2
 
+
+welt_model_node:
+  ros__parameters:
+    footprint_w: 0.2
+    footprint_h_back: 0.2
+    footprint_h_front: 0.2
