@@ -25,7 +25,7 @@ double rects_[][4][2] = {
 int number = 2;
 
 double car_coord[2] = {3.0 , -7.0};   // car的 x,y 坐标
-double car_size[3] = {1.0, 0.5, 1.0}; // car的size
+double car_size[3] = {3.0, 0.5, 1.0}; // car的size
 
 bool test_cancel = false;
 

@@ -3,7 +3,7 @@ compute_right_edge_path_action_server:
     path_topic_name: "garage_path"
     dis_thr: 2.5
     resolution: 2.1
-    test: true
+    test: false
     robot_x_test: -1.0
     robot_y_test: 21.5
 
