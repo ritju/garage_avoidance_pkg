@@ -43,12 +43,14 @@ namespace garage_utils_pkg
                 this->declare_parameter<bool>("test", false);
                 this->declare_parameter<double>("robot_x_test", 0.0);
                 this->declare_parameter<double>("robot_y_test", 3.5);
+                this->declare_parameter<bool>("strict_mode", true);
 
                 this->dis_thr_ = this->get_parameter_or("dis_thr", 2.5);
                 this->path_topic_name_ = this->get_parameter_or("path_topic_name", std::string("garage_path"));
                 this->test = this->get_parameter_or("test", false);
                 this->robot_x_test = this->get_parameter_or("robot_x_test", 0.0);
                 this->robot_y_test = this->get_parameter_or("robot_y_test", 3.5);
+                this->strict_mode = this->get_parameter_or("strict_mode", true);
 
                 RCLCPP_INFO(get_logger(), "------------ list params ------------ ");
                 RCLCPP_INFO(get_logger(), "dist_thr: %f", this->dis_thr_);
@@ -56,6 +58,7 @@ namespace garage_utils_pkg
                 RCLCPP_INFO(get_logger(), "robot_x_test: %f", robot_x_test);
                 RCLCPP_INFO(get_logger(), "robot_y_test: %f", robot_y_test);
                 RCLCPP_INFO(get_logger(), "test: %s", test?"true":"false");
+                RCLCPP_INFO(get_logger(), "strict_mode: %s", strict_mode?"true":"false");
         }
 
         void ComputeRightEdgePathActionServer::print_polygons(const std::vector<geometry_msgs::msg::Polygon> polygons)
