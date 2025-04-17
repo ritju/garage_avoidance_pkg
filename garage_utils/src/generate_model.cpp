@@ -923,6 +923,58 @@ namespace garage_utils_pkg
                 assert_(robot_edge_index != -1, ss.str());
                 RCLCPP_INFO(node_->get_logger(), " [generate_model] robot(%f, %f) edge_index: %d", robot_pose_x_, robot_pose_y_, robot_edge_index);
 
+                // car_pose 和 robot_pose组成的edge_tmp,满足同时和起点edge及edge_tmp相邻的edge，要从起点edge的相邻关系中删除
+                Edge edge_tmp;
+                edge_tmp.pt1.first = car_pose_x_;
+                edge_tmp.pt1.second = car_pose_y_;
+                edge_tmp.pt2.first = robot_pose_x_;
+                edge_tmp.pt2.second = robot_pose_y_;
+                
+                if (node_->has_parameter("stric_mode"))
+                {
+                        this->strict_mode = true;
+                }
+                RCLCPP_INFO(node_->get_logger(), " [generate_model] strict mode: %s", this->strict_mode ? "true" : "false");
+                std::vector<int> vec_del;
+                if (this->strict_mode && (adj.count(robot_edge_index) > 0))
+                {
+                    for (int v : adj.at(robot_edge_index))
+                    {
+                        if (is_neighbor(edge_tmp, edges[v], dis_thr_) && strict_mode_check(edge_tmp, edges[v]))
+                        {
+                                RCLCPP_INFO(node_->get_logger(), " [generate_model] edge [(%f, %f,), (%f, %f)] delete.",
+                                        edges[v].pt1.first, edges[v].pt1.second,
+                                        edges[v].pt2.first, edges[v].pt2.second);
+                                vec_del.push_back(v);                          
+                        }
+                        else
+                        {
+                                RCLCPP_INFO(node_->get_logger(), " [generate_model] edge [(%f, %f,), (%f, %f)] reserve.");
+                        }
+                    }
+                    for (size_t i = 0; i < vec_del.size(); i++)
+                    {
+                        int number_delete = vec_del[i];
+                        for (auto it = adj.at(robot_edge_index).begin(); it != adj.at(robot_edge_index).end();)
+                        {
+                                if (*it == number_delete)
+                                {
+                                        it = adj.at(robot_edge_index).erase(it);
+                                }
+                                else
+
+                                {
+                                        it++;
+                                }
+                        }   
+                    }
+                    if (adj.at(robot_edge_index).size() == 0)
+                    {
+                        adj.erase(robot_edge_index);
+                    }    
+                }
+
+
                 // 根据相邻关系，按BFS排序。
                 std::vector<int>order;
                 std::queue<int> q;
@@ -1008,6 +1060,47 @@ namespace garage_utils_pkg
 
                 return ret;
         }  
+
+        bool GenerateModel::strict_mode_check(Edge edge_tmp, Edge edge_neighbor)
+        {
+                bool ret = true;
+
+                Point pt1 = edge_neighbor.pt1;
+                Point pt2 = edge_neighbor.pt2;
+                Point pt_selected;
+                double dis1 = point_to_line_distance_smart(pt1.first, pt1.second, edge_tmp.pt1.first, edge_tmp.pt1.second, edge_tmp.pt2.first, edge_tmp.pt2.second);
+                double dis2 = point_to_line_distance_smart(pt2.first, pt2.second, edge_tmp.pt1.first, edge_tmp.pt1.second, edge_tmp.pt2.first, edge_tmp.pt2.second);
+                pt_selected = dis1 < dis2 ? pt1 : pt2;
+                double dis_min = dis1 < dis2 ? dis1 : dis2;
+
+                double x,y;
+                x = pt_selected.first;
+                y = pt_selected.second;
+
+                double car_x = edge_tmp.pt1.first;
+                double car_y = edge_tmp.pt1.second;
+                double robot_x = edge_tmp.pt2.first;
+                double robot_y = edge_tmp.pt2.second;
+
+                double dis_car = distance(x, y, car_x, car_y);
+                double dis_robot = distance(x, y, robot_x, robot_y);
+
+                RCLCPP_INFO(node_->get_logger(), " [generate_model]  x: %f, y: %f", x, y);
+                RCLCPP_INFO(node_->get_logger(), " [generate_model]  robot_x: %f, robot_y: %f", robot_x, robot_y);
+                RCLCPP_INFO(node_->get_logger(), " [generate_model]  car_x: %f, car_y: %f", car_x, car_y);
+                RCLCPP_INFO(node_->get_logger(), " [generate_model]  dis_car: %f", dis_car);
+                RCLCPP_INFO(node_->get_logger(), " [generate_model]  dis_robot: %f", dis_robot);
+                RCLCPP_INFO(node_->get_logger(), " [generate_model]  dis_min: %f", dis_min);
+                RCLCPP_INFO(node_->get_logger(), " [generate_model]  dis1: %f", dis1);
+                RCLCPP_INFO(node_->get_logger(), " [generate_model]  dis2: %f", dis2);
+
+                if (dis_robot < dis_car && std::abs(dis_min - dis_robot) < 1e-3)
+                {
+                        ret = false;
+                }                
+
+                return ret;
+        }
 
 } // end of namespace
 

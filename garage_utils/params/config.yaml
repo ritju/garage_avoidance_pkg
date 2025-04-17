@@ -6,6 +6,7 @@ compute_right_edge_path_action_server:
     test: false
     robot_x_test: -1.0
     robot_y_test: 21.5
+    strict_mode: true    #删除距离车子更近的危险路径
 
 test_compute_right_edge_path:
   ros__parameters:

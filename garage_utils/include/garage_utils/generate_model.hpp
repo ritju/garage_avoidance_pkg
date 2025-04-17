@@ -62,6 +62,9 @@ public:
 
         void sort_edges(std::vector<Edge>& edges);
 
+        // 判断是否距离car更近
+        bool strict_mode_check(Edge edge_tmp, Edge edge_neighbor);
+
         std::vector<EnhancedPoint> get_points()
         {
                 return points_;
@@ -89,7 +92,8 @@ private:
         double car_pose_x_;
         double car_pose_y_;
         double robot_pose_x_;
-        double robot_pose_y_;        
+        double robot_pose_y_;  
+        bool strict_mode{true};      
 };
 
 } // end of namespace
