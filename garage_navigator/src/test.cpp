@@ -6,6 +6,7 @@
 
 #include "visualization_msgs/msg/marker_array.hpp"
 #include <map>
+#include "garage_utils_msgs/msg/polygons.hpp"
 
 
 // double rects_[][4][2] = {
@@ -96,6 +97,9 @@ int main(int argc, char** argv)
         // define node
         auto node = std::make_shared<rclcpp::Node>("action_client");
 
+        // publisher
+        auto polygons_pub = node->create_publisher<garage_utils_msgs::msg::Polygons>("garage_polygons", rclcpp::QoS(1).reliable().transient_local());
+
         // generate map from uint8_t to string for states
         state_map[garage_utils_msgs::msg::State::INIT] = "INIT";
         state_map[garage_utils_msgs::msg::State::SEARCHING_PARKING_SPACE] = "SEARCHING_PARKING_SPACE";
@@ -150,6 +154,7 @@ int main(int argc, char** argv)
         car_pose.pose.position.y = car_coord[1];
         
         std::vector<geometry_msgs::msg::Polygon> polygons;
+        garage_utils_msgs::msg::Polygons polygons_msg;
         for (int i = 0; i < number; i++)
         {
                 geometry_msgs::msg::Polygon polygon;
@@ -161,8 +166,13 @@ int main(int argc, char** argv)
                         polygon.points.push_back(point);
                 }
                 polygons.push_back(polygon);
+                polygons_msg.polygons.push_back(polygon);
         }
-        
+
+        // publish polygons msg
+        RCLCPP_INFO(node->get_logger(), "publish garage_polygons topic one time ...");
+        polygons_pub->publish(polygons_msg);
+                
         RCLCPP_INFO(node->get_logger(), "create action client ...");
         auto client_ptr_ = rclcpp_action::create_client<garage_utils_msgs::action::GarageVehicleAvoidance>(
                 node, "/garage_vehicle_avoidance");

@@ -32,6 +32,7 @@ find_package(capella_ros_msg REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   #---msg--
   "msg/State.msg"
+  "msg/Polygons.msg"
   #---srv---
   #---action---
   "action/ComputeRightEdgePath.action"
