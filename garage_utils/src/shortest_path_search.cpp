@@ -293,7 +293,7 @@ namespace garage_utils_pkg
                         if (dis < dis_min)
                         {
                                 dis_min = dis;
-                                index = (int)i;
+                                index = points[i].index;
                         }
                 }                
 

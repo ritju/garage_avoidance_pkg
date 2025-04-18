@@ -33,6 +33,7 @@ void FindCarAvoidancePointAction::on_tick()
   getInput("polygons", goal_.polygons);
   getInput("car_pose", goal_.car_pose);
   getInput("car_size", goal_.car_size);
+  // RCLCPP_INFO(node_->get_logger(), "car_size: (%f, %f, %f)", goal_.car_size.x, goal_.car_size.y, goal_.car_size.z);
   // RCLCPP_INFO(node_->get_logger(), "on tick set state %d", garage_utils_msgs::msg::State::GENERATE_PATH);
   setOutput("state", garage_utils_msgs::msg::State::SEARCHING_PARKING_SPACE);
 

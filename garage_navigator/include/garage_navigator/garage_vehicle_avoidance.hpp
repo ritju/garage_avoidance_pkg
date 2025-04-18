@@ -105,7 +105,7 @@ protected:
   std::string polygons_blackboard_id_;
   std::string car_pose_blackboard_id_;
   std::string path_blackboard_id_;
-  std::string car_size_id_;
+  std::string car_size_blackboard_id_;
   std::string state_id_;
   std::string goals_blackboard_id_;
 

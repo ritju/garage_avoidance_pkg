@@ -30,7 +30,7 @@ namespace garage_utils_pkg
                for (size_t i = 0; i < points.size() - 1; i++)
                {
                     RCLCPP_INFO(node_->get_logger(), " [generate_path] ");
-                    RCLCPP_INFO(node_->get_logger(), " [generate_path] segment %zd->%zd", i, points.size()-2);
+                    RCLCPP_INFO(node_->get_logger(), " [generate_path] segment %zd->%zd", i, i+1);
                     auto pt1 = points[i];
                     auto pt2 = points[i + 1];
                     int index = find_polygon_index(pt1, pt2, polygons);
@@ -173,7 +173,7 @@ namespace garage_utils_pkg
                 if (on_line1) 
                 {
                         // 处理线段1的更新
-                        RCLCPP_INFO(node_->get_logger(), " [generate_path] process online1");
+                        RCLCPP_INFO(node_->get_logger(), " [generate_path] process => online1");
                         Point& p1 = line1.first;
                         Point& p2 = line1.second;
 
@@ -197,7 +197,7 @@ namespace garage_utils_pkg
                 else if (on_line2) 
                 {
                         // 处理线段2的更新
-                        RCLCPP_INFO(node_->get_logger(), " [generate_path] process online2");
+                        RCLCPP_INFO(node_->get_logger(), " [generate_path] process => online2");
                         Point& p3 = line2.first;
                         Point& p4 = line2.second;
                         double dist_p3_sq = (inter.first - p3.first) * (inter.first - p3.first) + (inter.second - p3.second) * (inter.second - p3.second);
@@ -216,26 +216,26 @@ namespace garage_utils_pkg
                 }
                 else
                 {
-                        // 处理线段1的更新
-                        RCLCPP_INFO(node_->get_logger(), " [generate_path] process neither online1 or online2");
-                        Point& p1 = line1.first;
-                        Point& p2 = line1.second;
+                        // 处理线段1的更新，交点可能在无法到达的区域，暂不做更新处理
+                        RCLCPP_INFO(node_->get_logger(), " [generate_path] process => neither online1 or online2");
+                        // Point& p1 = line1.first;
+                        // Point& p2 = line1.second;
 
-                        // 计算平方距离
-                        double dist_p1_sq = (inter.first - p1.first) * (inter.first - p1.first) + (inter.second - p1.second) * (inter.second - p1.second);
-                        double dist_p2_sq = (inter.first - p2.first) * (inter.first - p2.first) + (inter.second - p2.second) * (inter.second - p2.second);
+                        // // 计算平方距离
+                        // double dist_p1_sq = (inter.first - p1.first) * (inter.first - p1.first) + (inter.second - p1.second) * (inter.second - p1.second);
+                        // double dist_p2_sq = (inter.first - p2.first) * (inter.first - p2.first) + (inter.second - p2.second) * (inter.second - p2.second);
 
-                        if (dist_p1_sq <= dist_p2_sq) 
-                        {
-                                RCLCPP_INFO(node_->get_logger(), " [generate_path] update p1 with (%f, %f)", inter.first, inter.second);
-                                p1 = inter;
-                        }
-                        else 
-                        {
-                                RCLCPP_INFO(node_->get_logger(), " [generate_path] update p2 with (%f, %f)", inter.first, inter.second);
-                                p2 = inter;
-                                RCLCPP_INFO(node_->get_logger(), " [generate_path] new    p2   is (%f, %f)", line1.second.first, line1.second.second);
-                        }
+                        // if (dist_p1_sq <= dist_p2_sq) 
+                        // {
+                        //         RCLCPP_INFO(node_->get_logger(), " [generate_path] update p1 with (%f, %f)", inter.first, inter.second);
+                        //         p1 = inter;
+                        // }
+                        // else 
+                        // {
+                        //         RCLCPP_INFO(node_->get_logger(), " [generate_path] update p2 with (%f, %f)", inter.first, inter.second);
+                        //         p2 = inter;
+                        //         RCLCPP_INFO(node_->get_logger(), " [generate_path] new    p2   is (%f, %f)", line1.second.first, line1.second.second);
+                        // }
                 }
         }
 

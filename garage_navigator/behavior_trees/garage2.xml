@@ -2,8 +2,8 @@
   <BehaviorTree ID="MainTree">
         <Sequence>          
           <ComputeRightEdgePath polygons="{polygons}" car_pose="{car_pose}" garage_path="{garage_path}" goals="{goals}" state="{state}" />
-          <FindCarAvoidancePoint polygons="{polygons}" car_pose="{car_pose}" car_size="{car_size}" free_point="{free_point}" state="{state}" />
-          <WeltModelNode goal_pose="{free_point}" state="{state}"/>          
+          <!-- <FindCarAvoidancePoint polygons="{polygons}" car_pose="{car_pose}" car_size="{car_size}" free_point="{free_point}" state="{state}" />
+          <WeltModelNode goal_pose="{free_point}" state="{state}"/>           -->
           
         </Sequence>
   </BehaviorTree>
