@@ -474,8 +474,8 @@ namespace garage_utils_pkg
                 RCLCPP_INFO(node_->get_logger(), " [generate_model] process_intersected_edges");
                 
                 edges_tmp.clear();
-                Point pt_intersection;  // 相交的顶点
-                Edge edge_intersection;         // 相交的边体
+                Point pt_intersection;   // 相交的顶点
+                Edge edge_intersection;  // 相交的边体
                 Point pt_intersection_2; // 顶点和顶点相交时的另一个顶点
 
                 // step 1: 找到相交的顶点
@@ -521,14 +521,14 @@ namespace garage_utils_pkg
                 dis_pt_pt1 = distance(pt_intersection.first, pt_intersection.second, edge_intersection.pt1.first, edge_intersection.pt1.second);
                 dis_pt_pt2 = distance(pt_intersection.first, pt_intersection.second, edge_intersection.pt2.first, edge_intersection.pt2.second);
                 NeighborType intersection_type; // 0: 两个顶点相交， 1: 顶点与边体相交
-                if (dis_pt_pt1 == dis_min || dis_pt_pt1 < dis_thr_)
+                if (dis_pt_pt1 == dis_min || (dis_pt_pt1 < dis_thr_ && dis_pt_pt1 < dis_pt_pt2))
                 {
                         intersection_type = NeighborType::POINT_POINT;
                         pt_intersection_2 = edge_intersection.pt1;
                         RCLCPP_INFO(node_->get_logger(), " [generate_model] NeighborType: POINT_POINT");
                         RCLCPP_INFO(node_->get_logger(), " [generate_model] another intersection point: (%.1f, %.1f)", pt_intersection_2.first, pt_intersection_2.second);
                 }
-                else if (dis_pt_pt2 == dis_min || dis_pt_pt2 < dis_thr_)
+                else if (dis_pt_pt2 == dis_min || (dis_pt_pt2 < dis_thr_ && dis_pt_pt2 < dis_pt_pt1))
                 {
                         intersection_type = NeighborType::POINT_POINT;
                         pt_intersection_2 = edge_intersection.pt2;
@@ -949,7 +949,9 @@ namespace garage_utils_pkg
                         }
                         else
                         {
-                                RCLCPP_INFO(node_->get_logger(), " [generate_model] edge [(%f, %f,), (%f, %f)] reserve.");
+                                RCLCPP_INFO(node_->get_logger(), " [generate_model] edge [(%f, %f,), (%f, %f)] reserve.",
+                                        edges[v].pt1.first, edges[v].pt1.second,
+                                        edges[v].pt2.first, edges[v].pt2.second);
                         }
                     }
                     for (size_t i = 0; i < vec_del.size(); i++)
