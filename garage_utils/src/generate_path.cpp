@@ -88,6 +88,10 @@ namespace garage_utils_pkg
                         RCLCPP_INFO(node_->get_logger(), " [generate_path] end => x: %f, y: %f", path_end.first, path_end.second);
                         this->path_.poses.insert(this->path_.poses.end(), path.poses.begin(), path.poses.end());
                }
+               size_t size_before_filter = this->path_.poses.size();
+               filter_for_path(this->path_);
+               size_t size_after_filter = this->path_.poses.size();
+               RCLCPP_INFO(node_->get_logger(), "delte %ld pose(s).", size_before_filter - size_after_filter);
                add_orientation_for_path(this->path_);
                
         //        for (size_t i = 0; i < path_all.size(); i++)
@@ -95,6 +99,32 @@ namespace garage_utils_pkg
         //             this->path_.poses.reserve(this->path_.poses.size() + path_all[i].poses.size());
         //             this->path_.poses.insert(this->path_.poses.end(), path_all[i].poses.begin(), path_all[i].poses.end());
         //        }
+        }
+
+        void GeneratePath::filter_for_path(nav_msgs::msg::Path &path)
+        {
+               // 删除path中相邻且相同的pose
+               auto last = std::unique(path.poses.begin(), path.poses.end());
+               path.poses.erase(last, path.poses.end());
+        }
+
+        void GeneratePath::filter_for_path2(nav_msgs::msg::Path &path)
+        {
+                if (path.poses.empty())
+                {
+                        return;
+                }
+
+                size_t index = 0;  // 有效元素尾指针
+                for(size_t i = 1; i < path.poses.size(); ++i)
+                {
+                        if (path.poses[i] != path.poses[index])
+                        {
+                                ++index;
+                                path.poses[index] = path.poses[i]; // 覆盖写入新元素
+                        }
+                }
+                path.poses.resize(index+1);  // 截断尾部冗余元素
         }
         
         void GeneratePath::add_orientation_for_path(nav_msgs::msg::Path &path)

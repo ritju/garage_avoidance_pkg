@@ -7,6 +7,7 @@
 #include "nav_msgs/msg/path.hpp"
 #include "geometry_msgs/msg/polygon.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include <algorithm>
 
 
 namespace garage_utils_pkg
@@ -24,6 +25,8 @@ namespace garage_utils_pkg
                 nav_msgs::msg::Path generate_path_for_one_segment(const EnhancedPoint& pt1, const EnhancedPoint& pt2, const geometry_msgs::msg::Polygon& polygons);
                 std::pair<Point, Point> generate_path_for_one_segment2(const EnhancedPoint& pt1, const EnhancedPoint& pt2, const geometry_msgs::msg::Polygon& polygons);
                 void add_orientation_for_path(nav_msgs::msg::Path &path);
+                void filter_for_path(nav_msgs::msg::Path &path);
+                void filter_for_path2(nav_msgs::msg::Path &path);
 
                 bool isPointOnSegment(double px, double py, double x1, double y1, double x2, double y2);
                 bool isPointInPolygon(double px, double py, const std::vector<Vertex> polygon);
