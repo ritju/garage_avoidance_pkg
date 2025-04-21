@@ -91,7 +91,7 @@ namespace garage_utils_pkg
                size_t size_before_filter = this->path_.poses.size();
                filter_for_path(this->path_);
                size_t size_after_filter = this->path_.poses.size();
-               RCLCPP_INFO(node_->get_logger(), "delte %ld pose(s).", size_before_filter - size_after_filter);
+               RCLCPP_INFO(node_->get_logger(), "delete %ld pose(s).", size_before_filter - size_after_filter);
                add_orientation_for_path(this->path_);
                
         //        for (size_t i = 0; i < path_all.size(); i++)
