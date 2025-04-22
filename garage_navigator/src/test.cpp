@@ -8,6 +8,9 @@
 #include <map>
 #include "garage_utils_msgs/msg/polygons.hpp"
 
+#include "capella_ros_msg/msg/car_detect_array.hpp"
+#include <unistd.h>
+
 
 // double rects_[][4][2] = {
 //         {{1.0, 0.0}, {1.0, 20.0}, {-1.0, 20.0}, {-1.0, 0.0}},
@@ -19,15 +22,20 @@
 // };
 // int number = 6;
 
-double rects_[][4][3] = {
-        {{4.5, -6.0}, {4.0, 0.0}, {2.0, 0.0}, {2.5, -6.0}},
-        {{4.5, -6.0}, {4.5, -8.0}, {-6.0, -8.0}, {-6.0, -6.0}},
-        {{2.0, 0.0}, {-5.0, 0.0}, {-5.0, -2.0}, {2.0, -2.0}}
+// double rects_[][4][2] = {
+//         {{4.5, -6.0}, {4.0, 0.0}, {2.0, 0.0}, {2.5, -6.0}},
+//         {{4.5, -6.0}, {4.5, -8.0}, {-6.0, -8.0}, {-6.0, -6.0}},
+//         {{2.0, 0.0}, {-5.0, 0.0}, {-5.0, -2.0}, {2.0, -2.0}}
+// };
+// int number = 3;
+
+double rects_[][4][2] = {
+        {{-10.2, 9.5}, {-6.5, 11.5}, {18.5, -16.0}, {14.7,-19.3}}
 };
-int number = 3;
+int number = 1;
 
 double car_coord[2] = {3.0 , -7.0};   // car的 x,y 坐标
-double car_size[3] = {3.0, 0.5, 1.0}; // car的size
+double car_size[3] = {3.0, 0.6, 1.0}; // car的size
 
 bool test_cancel = false;
 
@@ -91,12 +99,29 @@ void result_callback(const rclcpp_action::ClientGoalHandle<garage_utils_msgs::ac
         std::cout << "reason: " << result.result->reason << std::endl;
 }
 
+bool received = false;
+capella_ros_msg::msg::CarDetectArray car_information_msg;
+bool test_in_garage = true;
+
+void car_information_callback(const capella_ros_msg::msg::CarDetectArray::SharedPtr msg)
+{
+        received = true;
+        car_information_msg = *msg;
+        RCLCPP_INFO(rclcpp::get_logger("test"), "received /car_information msg.");
+}
+
 int main(int argc, char** argv)
 {
         rclcpp::init(argc, argv);
 
         // define node
-        auto node = std::make_shared<rclcpp::Node>("action_client");
+        auto node = std::make_shared<rclcpp::Node>("test_garage_action_client");
+
+        auto callback_group = node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+        auto sub_options = rclcpp::SubscriptionOptions();
+        sub_options.callback_group = callback_group;
+        auto callback = std::bind(car_information_callback, std::placeholders::_1);
+        auto sub = node->create_subscription<capella_ros_msg::msg::CarDetectArray>("/car_information", rclcpp::SensorDataQoS(), callback, sub_options);
 
         // publisher
         auto polygons_pub = node->create_publisher<garage_utils_msgs::msg::Polygons>("garage_polygons", rclcpp::QoS(1).reliable().transient_local());
@@ -193,17 +218,65 @@ int main(int argc, char** argv)
         size.z = car_size[2];
         car_information.pose = car_pose;
         car_information.size = size;
-        goal_msg.cars_information.results.push_back(car_information);
-        goal_msg.polygons = polygons;
-        
-        RCLCPP_INFO(node->get_logger(), "Sending goal");
 
         auto send_goal_options = rclcpp_action::Client<garage_utils_msgs::action::GarageVehicleAvoidance>::SendGoalOptions();
         send_goal_options.goal_response_callback = goal_response_callback;
         send_goal_options.result_callback = result_callback;
         send_goal_options.feedback_callback = feedback_callback;
+        goal_msg.polygons = polygons;
 
-        auto future = client_ptr_->async_send_goal(goal_msg, send_goal_options);
+        if (!test_in_garage)
+        {
+                goal_msg.cars_information.results.push_back(car_information);
+                
+                RCLCPP_INFO(node->get_logger(), "Sending goal");
+                auto future = client_ptr_->async_send_goal(goal_msg, send_goal_options);
+        }
+        else
+        {
+                RCLCPP_INFO(node->get_logger(), "test in garage");
+                std::thread([&](){
+                        try{
+                        while(true)
+                        {
+                                if (!received)
+                                {
+                                        RCLCPP_INFO(node->get_logger(), "normal driving ...");
+                                        sleep(1);
+                                }
+                                else
+                                {
+                                        RCLCPP_INFO(node->get_logger(), "reset sub for /car_information topic.");
+                                        sub.reset();
+                                        RCLCPP_INFO(node->get_logger(), "car_pose: (%f, %f)", 
+                                                car_information_msg.results[0].pose.pose.position.x,
+                                                car_information_msg.results[0].pose.pose.position.y);
+                                        RCLCPP_INFO(node->get_logger(), "car_size: (%f, %f, %f)",
+                                                car_information_msg.results[0].size.x,
+                                                car_information_msg.results[0].size.y,
+                                                car_information_msg.results[0].size.z);                                        
+                                        RCLCPP_INFO(node->get_logger(), "car_speed=> linear_x: %f, angular_z: %f)", 
+                                                car_information_msg.results[0].speed.twist.linear.x,
+                                                car_information_msg.results[0].speed.twist.angular.z);
+                                        RCLCPP_INFO(node->get_logger(), "Sending goal");
+                                        goal_msg.cars_information = car_information_msg;
+                                        auto future = client_ptr_->async_send_goal(goal_msg, send_goal_options);
+                                        break;
+                                }
+                        }}
+                        catch(...)
+                        {
+                                RCLCPP_INFO(node->get_logger(), "unknow exception.");
+                        }
+                }).detach();
+                
+        }       
+        
+        
+
+        rclcpp::executors::MultiThreadedExecutor executor;
+        executor.add_node(node);
+        executor.spin();
 
         // test for cancel goal
         if (test_cancel)
@@ -223,10 +296,10 @@ int main(int argc, char** argv)
                         }   
                         }).detach();
         }
+
+       
         
-        rclcpp::executors::MultiThreadedExecutor executor;
-        executor.add_node(node);
-        executor.spin();
+        
         // rclcpp::spin(node);
         rclcpp::shutdown();
 }
