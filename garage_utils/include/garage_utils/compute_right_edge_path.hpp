@@ -39,6 +39,7 @@ public:
   ~ComputeRightEdgePathActionServer();
 
   size_t get_current_polygon_index(double x, double y, std::vector<geometry_msgs::msg::Polygon> polygons);
+  std::vector<Point> generate_first_polygon(double robot_x, double robot_y, double car_x, double car_y, std::vector<geometry_msgs::msg::Polygon> &polygons);
   bool get_map_robot_tf();
   
     // 检查goal的合法性

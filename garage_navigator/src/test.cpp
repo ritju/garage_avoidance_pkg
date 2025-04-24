@@ -10,6 +10,7 @@
 
 #include "capella_ros_msg/msg/car_detect_array.hpp"
 #include <unistd.h>
+#include <nlohmann/json.hpp>
 
 
 // double rects_[][4][2] = {
@@ -20,8 +21,9 @@
 //         {{10.5, 22.0}, {12.5, 22.0}, {12.5, 33.0}, {10.5, 33.0}},
 //         {{-13.0, 10.0}, {-11.0, 30.0}, {-13.0, 30.0}, {-11.0, 10.0}}  // 打乱顺序
 // };
-// int number = 6;
+// int number = 6;   // 无地图纯测试环境
 
+// 一楼三个通道
 // double rects_[][4][2] = {
 //         {{4.5, -6.0}, {4.0, 0.0}, {2.0, 0.0}, {2.5, -6.0}},
 //         {{4.5, -6.0}, {4.5, -8.0}, {-6.0, -8.0}, {-6.0, -6.0}},
@@ -29,10 +31,16 @@
 // };
 // int number = 3;
 
+// 车库3米通道
 double rects_[][4][2] = {
-        {{-10.2, 9.5}, {-6.5, 11.5}, {18.5, -16.0}, {14.7,-19.3}}
+        {{-8.7, 9.3}, {-6.5, 11.5}, {18.5, -16.0}, {16.2,-18.1}}
 };
 int number = 1;
+
+// double rects_[][4][2] = {
+//         {{-10.2, 9.5}, {-6.5, 11.5}, {18.5, -16.0}, {14.7,-19.3}}
+// };
+// int number = 1;
 
 double car_coord[2] = {3.0 , -7.0};   // car的 x,y 坐标
 double car_size[3] = {3.0, 0.6, 1.0}; // car的size
@@ -110,12 +118,53 @@ void car_information_callback(const capella_ros_msg::msg::CarDetectArray::Shared
         RCLCPP_INFO(rclcpp::get_logger("test"), "received /car_information msg.");
 }
 
+std::vector<std::vector<double>> parse_json_array(const std::string& json_str) {
+        auto json = nlohmann::json::parse(json_str);
+        std::vector<std::vector<double>> result;
+
+        for (const auto& inner_array : json) {
+            std::vector<double> vec;
+            for (auto val : inner_array) vec.push_back(val.get<double>());
+            result.push_back(vec);
+        }
+        return result;
+    }
+
 int main(int argc, char** argv)
 {
         rclcpp::init(argc, argv);
 
         // define node
         auto node = std::make_shared<rclcpp::Node>("test_garage_action_client");
+
+        RCLCPP_INFO(node->get_logger(), "get params from params file");
+        // get polygon coords from params file
+        std::vector<std::vector<std::vector<double>>> rects2_;
+        node->declare_parameter("polygons", std::vector<std::string>());
+        auto param_polygons = node->get_parameter("polygons").as_string_array();
+        
+        number = param_polygons.size();
+
+        for(int i = 0; i < number; i++)
+        {
+                RCLCPP_INFO(node->get_logger(), "polygon: %s", param_polygons[i].c_str());
+        }
+
+        for (int i = 0; i < number; i++)
+        {
+                auto rect_coords = parse_json_array(param_polygons[i]);
+                rects2_.push_back(rect_coords);
+        }
+
+        // get other params
+        node->declare_parameter<bool>("test_cancel", false);
+        node->declare_parameter<bool>("test_in_garage", false);
+
+        node->get_parameter<bool>("test_cancel", test_cancel);
+        node->get_parameter<bool>("test_in_garage", test_in_garage);
+
+        RCLCPP_INFO(node->get_logger(), "test_cancel: %s", test_cancel ? "true" : "false");
+        RCLCPP_INFO(node->get_logger(), "test_in_garage: %s", test_in_garage ? "true" : "false");
 
         auto callback_group = node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
         auto sub_options = rclcpp::SubscriptionOptions();
@@ -154,13 +203,17 @@ int main(int argc, char** argv)
                 for (int j = 0; j < 4; j++)
                 {
                         geometry_msgs::msg::Point p_start;
-                        p_start.x = rects_[i][j][0];
-                        p_start.y = rects_[i][j][1];
+                        // p_start.x = rects_[i][j][0];
+                        // p_start.y = rects_[i][j][1];
+                        p_start.x = rects2_[i][j][0];
+                        p_start.y = rects2_[i][j][1];
                         p_start.z = 0.0;
                         msg.points.push_back(p_start);
                         geometry_msgs::msg::Point p_end;
-                        p_end.x = rects_[i][(j+1)%4][0];
-                        p_end.y = rects_[i][(j+1)%4][1];
+                        // p_end.x = rects_[i][(j+1)%4][0];
+                        // p_end.y = rects_[i][(j+1)%4][1];
+                        p_end.x = rects2_[i][(j+1)%4][0];
+                        p_end.y = rects2_[i][(j+1)%4][1];
                         p_end.z = 0.0;
                         msg.points.push_back(p_end);
                 }
@@ -187,8 +240,10 @@ int main(int argc, char** argv)
                 for (int j = 0; j < 4; j++)
                 {
                         geometry_msgs::msg::Point32 point;
-                        point.x = rects_[i][j][0];
-                        point.y = rects_[i][j][1];
+                        // point.x = rects_[i][j][0];
+                        // point.y = rects_[i][j][1];
+                        point.x = rects2_[i][j][0];
+                        point.y = rects2_[i][j][1];
                         polygon.points.push_back(point);
                 }
                 polygons.push_back(polygon);

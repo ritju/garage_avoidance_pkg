@@ -179,113 +179,124 @@ namespace garage_utils_pkg
                                 robot_y = robot_y_test;
                         }
                         
-                        RCLCPP_INFO(get_logger(), "robot_pose: (%f, %f)", robot_x, robot_y);
+                        // RCLCPP_INFO(get_logger(), "robot_pose: (%f, %f)", robot_x, robot_y);
 
-                        size_t current_index = get_current_polygon_index(robot_x, robot_y, polygons_);
-                        RCLCPP_INFO(get_logger(), "current_index: %ld", current_index);
-                        auto polygon_first = this->polygons_[current_index];                
-                        this->polygons_.erase(polygons_.begin() + current_index);
+                        // size_t current_index = get_current_polygon_index(robot_x, robot_y, polygons_);
+                        // RCLCPP_INFO(get_logger(), "current_index: %ld", current_index);
+                        // auto polygon_first = this->polygons_[current_index];                
+                        // this->polygons_.erase(polygons_.begin() + current_index);
 
-                        // 找到起点边框的middle_long_line
-                        EnhancedRect enhanced_rect;
-                        for (size_t j = 0; j < polygon_first.points.size(); j++)
-                        {
-                                Vertex vertex;
-                                vertex.x = polygon_first.points[j].x;
-                                vertex.y = polygon_first.points[j].y;
-                                enhanced_rect.vertices.push_back(vertex);
-                        }
-                        model_generator_->sortVertices(enhanced_rect);
-                        model_generator_->generate_middle_long_line(enhanced_rect);
+                        // // 找到起点边框的middle_long_line
+                        // EnhancedRect enhanced_rect;
+                        // for (size_t j = 0; j < polygon_first.points.size(); j++)
+                        // {
+                        //         Vertex vertex;
+                        //         vertex.x = polygon_first.points[j].x;
+                        //         vertex.y = polygon_first.points[j].y;
+                        //         enhanced_rect.vertices.push_back(vertex);
+                        // }
+                        // model_generator_->sortVertices(enhanced_rect);
+                        // model_generator_->generate_middle_long_line(enhanced_rect);
 
-                        RCLCPP_INFO(get_logger(), "print first enhanced rect info before cutting.");
-                        print_rect(enhanced_rect);
+                        // RCLCPP_INFO(get_logger(), "print first enhanced rect info before cutting.");
+                        // print_rect(enhanced_rect);
 
-                        // 对起点边框进行切割
-                        // 找到两条长边框(和middle_long_line的夹角最小的两条边)
-                        std::vector<std::pair<Point, Point>> edges;
-                        for (size_t i = 0; i < enhanced_rect.vertices.size(); i++)
-                        {
-                                std::pair<Point, Point> edge;
-                                edge.first.first = enhanced_rect.vertices[i].x;
-                                edge.first.second = enhanced_rect.vertices[i].y;
-                                edge.second.first = enhanced_rect.vertices[ (i + 1) % 4].x;
-                                edge.second.second = enhanced_rect.vertices[(i + 1) % 4].y;
-                                edges.push_back(edge);
-                        }
-                        // 把edges按与middle_long_line的夹角按从小到大的顺序排序
-                        std::sort(edges.begin(), edges.end(), 
-                                [enhanced_rect, this](std::pair<Point, Point>& edge1, std::pair<Point, Point>& edge2)
-                                {
-                                        return theta_between_two_edges(edge1.first, edge1.second,
-                                                enhanced_rect.middle_long_line[0], enhanced_rect.middle_long_line[1]) 
-                                                <
-                                                theta_between_two_edges(edge2.first, edge2.second,
-                                                enhanced_rect.middle_long_line[0], enhanced_rect.middle_long_line[1]) ;
-                                });
-                        auto long_line1 = edges[0];
-                        auto long_line2 = edges[1];
-                        RCLCPP_INFO(get_logger(), "long line1 => [ (%f, %f), (%f, %f) ]", 
-                                long_line1.first.first, long_line1.first.second,
-                                long_line1.second.first, long_line1.second.second);
-                        RCLCPP_INFO(get_logger(), "long line2 => [ (%f, %f), (%f, %f) ]", 
-                                long_line2.first.first, long_line2.first.second,
-                                long_line2.second.first, long_line2.second.second);
+                        // // 对起点边框进行切割
+                        // // 找到两条长边框(和middle_long_line的夹角最小的两条边)
+                        // std::vector<std::pair<Point, Point>> edges;
+                        // for (size_t i = 0; i < enhanced_rect.vertices.size(); i++)
+                        // {
+                        //         std::pair<Point, Point> edge;
+                        //         edge.first.first = enhanced_rect.vertices[i].x;
+                        //         edge.first.second = enhanced_rect.vertices[i].y;
+                        //         edge.second.first = enhanced_rect.vertices[ (i + 1) % 4].x;
+                        //         edge.second.second = enhanced_rect.vertices[(i + 1) % 4].y;
+                        //         edges.push_back(edge);
+                        // }
+                        // // 把edges按与middle_long_line的夹角按从小到大的顺序排序
+                        // std::sort(edges.begin(), edges.end(), 
+                        //         [enhanced_rect, this](std::pair<Point, Point>& edge1, std::pair<Point, Point>& edge2)
+                        //         {
+                        //                 return theta_between_two_edges(edge1.first, edge1.second,
+                        //                         enhanced_rect.middle_long_line[0], enhanced_rect.middle_long_line[1]) 
+                        //                         <
+                        //                         theta_between_two_edges(edge2.first, edge2.second,
+                        //                         enhanced_rect.middle_long_line[0], enhanced_rect.middle_long_line[1]) ;
+                        //         });
+                        // auto long_line1 = edges[0];
+                        // auto long_line2 = edges[1];
+                        // RCLCPP_INFO(get_logger(), "long line1 => [ (%f, %f), (%f, %f) ]", 
+                        //         long_line1.first.first, long_line1.first.second,
+                        //         long_line1.second.first, long_line1.second.second);
+                        // RCLCPP_INFO(get_logger(), "long line2 => [ (%f, %f), (%f, %f) ]", 
+                        //         long_line2.first.first, long_line2.first.second,
+                        //         long_line2.second.first, long_line2.second.second);
                         
-                        // 选取原有的两个顶点
-                        Point p1_selected, p2_selected;
+                        // // 选取原有的两个顶点
+                        // Point p1_selected, p2_selected;
 
-                        double l1_x = long_line1.second.first - long_line1.first.first;
-                        double l1_y = long_line1.second.second - long_line1.first.second;
-                        double l2_x = long_line2.second.first - long_line2.first.first;
-                        double l2_y = long_line2.second.second - long_line2.first.second;
-                        double car_robot_x = robot_x - car_x;
-                        double car_robot_y = robot_y - car_y;
+                        // double l1_x = long_line1.second.first - long_line1.first.first;
+                        // double l1_y = long_line1.second.second - long_line1.first.second;
+                        // double l2_x = long_line2.second.first - long_line2.first.first;
+                        // double l2_y = long_line2.second.second - long_line2.first.second;
+                        // double car_robot_x = robot_x - car_x;
+                        // double car_robot_y = robot_y - car_y;
 
-                        double dot1, dot2;
+                        // double dot1, dot2;
 
-                        dot1 = l1_x * car_robot_x + l1_y * car_robot_y;
-                        if (dot1 > 0)
-                        {
-                                p1_selected = long_line1.second;
-                        }
-                        else
-                        {
-                                p1_selected = long_line1.first;
-                        }
+                        // dot1 = l1_x * car_robot_x + l1_y * car_robot_y;
+                        // if (dot1 > 0)
+                        // {
+                        //         p1_selected = long_line1.second;
+                        // }
+                        // else
+                        // {
+                        //         p1_selected = long_line1.first;
+                        // }
 
-                        dot2 = l2_x * car_robot_x + l2_y * car_robot_y;
-                        if (dot2 > 0)
-                        {
-                                p2_selected = long_line2.second;
-                        }
-                        else
-                        {
-                                p2_selected = long_line2.first;
-                        }
+                        // dot2 = l2_x * car_robot_x + l2_y * car_robot_y;
+                        // if (dot2 > 0)
+                        // {
+                        //         p2_selected = long_line2.second;
+                        // }
+                        // else
+                        // {
+                        //         p2_selected = long_line2.first;
+                        // }
 
-                        RCLCPP_INFO(get_logger(), "dot1: %f, dot2: %f", dot1, dot2);
-                        RCLCPP_INFO(get_logger(), "p1_selected: (%f, %f)", p1_selected.first, p1_selected.second);
-                        RCLCPP_INFO(get_logger(), "p2_selected: (%f, %f)", p2_selected.first, p2_selected.second);
+                        // RCLCPP_INFO(get_logger(), "dot1: %f, dot2: %f", dot1, dot2);
+                        // RCLCPP_INFO(get_logger(), "p1_selected: (%f, %f)", p1_selected.first, p1_selected.second);
+                        // RCLCPP_INFO(get_logger(), "p2_selected: (%f, %f)", p2_selected.first, p2_selected.second);
 
-                        // 找到切割的矩形的另外两个点
-                        Point p3_selected, p4_selected;
-                        p3_selected = find_neareast_point(robot_x, robot_y, long_line1.first.first, long_line1.first.second, long_line1.second.first, long_line1.second.second);
-                        p4_selected = find_neareast_point(robot_x, robot_y, long_line2.first.first, long_line2.first.second, long_line2.second.first, long_line2.second.second);
+                        // // 找到切割的矩形的另外两个点
+                        // Point p3_selected, p4_selected;
+                        // p3_selected = find_neareast_point(robot_x, robot_y, long_line1.first.first, long_line1.first.second, long_line1.second.first, long_line1.second.second);
+                        // p4_selected = find_neareast_point(robot_x, robot_y, long_line2.first.first, long_line2.first.second, long_line2.second.first, long_line2.second.second);
 
-                        RCLCPP_INFO(get_logger(), "p3_selected: (%f, %f)", p3_selected.first, p3_selected.second);
-                        RCLCPP_INFO(get_logger(), "p4_selected: (%f, %f)", p4_selected.first, p4_selected.second);
+                        // RCLCPP_INFO(get_logger(), "p3_selected: (%f, %f)", p3_selected.first, p3_selected.second);
+                        // RCLCPP_INFO(get_logger(), "p4_selected: (%f, %f)", p4_selected.first, p4_selected.second);
+
+                        geometry_msgs::msg::Polygon polygon_first;
+                        Point p1_selected, p2_selected, p3_selected, p4_selected;
+                        auto p_v = generate_first_polygon(robot_x, robot_y, car_x, car_y, this->polygons_);
 
                         // bug fix p1==p3 || p2==p4
-                        if (p1_selected == p3_selected || p2_selected == p4_selected)
+                        if (p_v[0] == p_v[2] || p_v[1] == p_v[3])
                         {
-                                result->success = false;
-                                result->path = nav_msgs::msg::Path();
-                                result->poses = this->path_.poses;
-                                goal_handle->abort(result);
-                                RCLCPP_INFO(get_logger(), "Goal Failed, fix p1==p3 || p2==p4");
-                                return;
+                                // result->success = false;
+                                // result->path = nav_msgs::msg::Path();
+                                // result->poses = this->path_.poses;
+                                // goal_handle->abort(result);
+                                RCLCPP_INFO(get_logger(), "p1==p3 || p2==p4, need change index of start polygon.");
+                                p_v = generate_first_polygon(robot_x, robot_y, car_x, car_y, this->polygons_);
+                                // return;
                         }
+                        
+                        p1_selected = p_v[0];
+                        p2_selected = p_v[1];
+                        p3_selected = p_v[2];
+                        p4_selected = p_v[3];
+                        
                         
                         // 更新 polygon_first
                         polygon_first.points.clear();
@@ -572,6 +583,114 @@ namespace garage_utils_pkg
                         }
                 }
                 return index;
+        }
+
+        std::vector<Point> ComputeRightEdgePathActionServer::generate_first_polygon(double robot_x, double robot_y, double car_x, double car_y,std::vector<geometry_msgs::msg::Polygon> &polygons)
+        {
+                RCLCPP_INFO(get_logger(), "robot_pose: (%f, %f)", robot_x, robot_y);
+
+                size_t current_index = get_current_polygon_index(robot_x, robot_y, polygons_);
+                RCLCPP_INFO(get_logger(), "current_index: %ld", current_index);
+                auto polygon_first = this->polygons_[current_index];                
+                this->polygons_.erase(polygons_.begin() + current_index);
+
+                // 找到起点边框的middle_long_line
+                EnhancedRect enhanced_rect;
+                for (size_t j = 0; j < polygon_first.points.size(); j++)
+                {
+                        Vertex vertex;
+                        vertex.x = polygon_first.points[j].x;
+                        vertex.y = polygon_first.points[j].y;
+                        enhanced_rect.vertices.push_back(vertex);
+                }
+                model_generator_->sortVertices(enhanced_rect);
+                model_generator_->generate_middle_long_line(enhanced_rect);
+
+                RCLCPP_INFO(get_logger(), "print first enhanced rect info before cutting.");
+                print_rect(enhanced_rect);
+
+                // 对起点边框进行切割
+                // 找到两条长边框(和middle_long_line的夹角最小的两条边)
+                std::vector<std::pair<Point, Point>> edges;
+                for (size_t i = 0; i < enhanced_rect.vertices.size(); i++)
+                {
+                        std::pair<Point, Point> edge;
+                        edge.first.first = enhanced_rect.vertices[i].x;
+                        edge.first.second = enhanced_rect.vertices[i].y;
+                        edge.second.first = enhanced_rect.vertices[ (i + 1) % 4].x;
+                        edge.second.second = enhanced_rect.vertices[(i + 1) % 4].y;
+                        edges.push_back(edge);
+                }
+                // 把edges按与middle_long_line的夹角按从小到大的顺序排序
+                std::sort(edges.begin(), edges.end(), 
+                        [enhanced_rect, this](std::pair<Point, Point>& edge1, std::pair<Point, Point>& edge2)
+                        {
+                                return theta_between_two_edges(edge1.first, edge1.second,
+                                        enhanced_rect.middle_long_line[0], enhanced_rect.middle_long_line[1]) 
+                                        <
+                                        theta_between_two_edges(edge2.first, edge2.second,
+                                        enhanced_rect.middle_long_line[0], enhanced_rect.middle_long_line[1]) ;
+                        });
+                auto long_line1 = edges[0];
+                auto long_line2 = edges[1];
+                RCLCPP_INFO(get_logger(), "long line1 => [ (%f, %f), (%f, %f) ]", 
+                        long_line1.first.first, long_line1.first.second,
+                        long_line1.second.first, long_line1.second.second);
+                RCLCPP_INFO(get_logger(), "long line2 => [ (%f, %f), (%f, %f) ]", 
+                        long_line2.first.first, long_line2.first.second,
+                        long_line2.second.first, long_line2.second.second);
+                
+                // 选取原有的两个顶点
+                Point p1_selected, p2_selected;
+
+                double l1_x = long_line1.second.first - long_line1.first.first;
+                double l1_y = long_line1.second.second - long_line1.first.second;
+                double l2_x = long_line2.second.first - long_line2.first.first;
+                double l2_y = long_line2.second.second - long_line2.first.second;
+                double car_robot_x = robot_x - car_x;
+                double car_robot_y = robot_y - car_y;
+
+                double dot1, dot2;
+
+                dot1 = l1_x * car_robot_x + l1_y * car_robot_y;
+                if (dot1 > 0)
+                {
+                        p1_selected = long_line1.second;
+                }
+                else
+                {
+                        p1_selected = long_line1.first;
+                }
+
+                dot2 = l2_x * car_robot_x + l2_y * car_robot_y;
+                if (dot2 > 0)
+                {
+                        p2_selected = long_line2.second;
+                }
+                else
+                {
+                        p2_selected = long_line2.first;
+                }
+
+                RCLCPP_INFO(get_logger(), "dot1: %f, dot2: %f", dot1, dot2);
+                RCLCPP_INFO(get_logger(), "p1_selected: (%f, %f)", p1_selected.first, p1_selected.second);
+                RCLCPP_INFO(get_logger(), "p2_selected: (%f, %f)", p2_selected.first, p2_selected.second);
+
+                // 找到切割的矩形的另外两个点
+                Point p3_selected, p4_selected;
+                p3_selected = find_neareast_point(robot_x, robot_y, long_line1.first.first, long_line1.first.second, long_line1.second.first, long_line1.second.second);
+                p4_selected = find_neareast_point(robot_x, robot_y, long_line2.first.first, long_line2.first.second, long_line2.second.first, long_line2.second.second);
+
+                RCLCPP_INFO(get_logger(), "p3_selected: (%f, %f)", p3_selected.first, p3_selected.second);
+                RCLCPP_INFO(get_logger(), "p4_selected: (%f, %f)", p4_selected.first, p4_selected.second);
+
+                std::vector<Point> ret;
+                ret.push_back(p1_selected);
+                ret.push_back(p2_selected);
+                ret.push_back(p3_selected);
+                ret.push_back(p4_selected);
+
+                return ret;
         }
 
         bool ComputeRightEdgePathActionServer::isPointOnSegment(double px, double py, double x1, double y1, double x2, double y2)

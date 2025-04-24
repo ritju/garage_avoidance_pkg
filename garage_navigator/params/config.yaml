@@ -1,7 +1,7 @@
 bt_garage_navigator:
   ros__parameters:
     use_sim: false
-    default_nav_garage_avoidance_bt_xml: /workspaces/capella_ros_docker/install/share/garage_navigator/behavior_trees/garage3.xml
+    default_nav_garage_avoidance_bt_xml: /workspaces/capella_ros_docker/install/share/garage_navigator/behavior_trees/garage2.xml
     plugin_lib_names:
       - "compute_right_edge_path_action"
       - "find_car_avoidance_point_action"
@@ -70,10 +70,23 @@ bt_garage_navigator:
 
 lifecycle_manager:
   ros__parameters:
-    autostart:true:
+    autostart: true
     node_names:
       [
         "bt_garage_navigator",
         "robot_avoidance"
       ]
     bond_timeout: 4.0
+
+test_garage_action_client:
+  ros__parameters:
+    test_cancel: false
+    test_in_garage: true
+    polygons:
+      # - "[[4.5, -6.0],[4.0, 0.0],[2.0, 0.0],[2.5, -6.0]]"           # 一楼3通道 begin
+      # - "[[4.5, -6.0],[4.5, -8.0],[-6.0, -8.0],[-6.0, -6.0]]"
+      # - "[[2.0, 0.0],[-5.0, 0.0],[-5.0, -2.0],[2.0, -2.0]]"         # 一楼3通道 end
+      - "[[-8.7, 9.3], [-6.5, 11.5], [18.5, -16.0], [16.2,-18.1]]"  # -1楼3米通道
+      # - "[[-10.2, 9.5], [-6.5, 11.5], [18.5, -16.0], [14.7,-19.3]]" # -1楼4米通道
+      # - "[[-10.2, 9.5], [-6.5, 11.5], [18.5, -16.0], [14.7,-19.3]]" # -1楼6米通道
+
