@@ -521,6 +521,7 @@ namespace garage_utils_pkg
                 dis_pt_pt1 = distance(pt_intersection.first, pt_intersection.second, edge_intersection.pt1.first, edge_intersection.pt1.second);
                 dis_pt_pt2 = distance(pt_intersection.first, pt_intersection.second, edge_intersection.pt2.first, edge_intersection.pt2.second);
                 NeighborType intersection_type; // 0: 两个顶点相交， 1: 顶点与边体相交
+                RCLCPP_INFO(node_->get_logger(), " [generate_model] dis_min: %f, dis_pt_pt1: %f, dis_pt_pt2: %f", dis_min, dis_pt_pt1, dis_pt_pt2);
                 if (dis_pt_pt1 == dis_min || (dis_pt_pt1 < dis_thr_ && dis_pt_pt1 < dis_pt_pt2))
                 {
                         intersection_type = NeighborType::POINT_POINT;
