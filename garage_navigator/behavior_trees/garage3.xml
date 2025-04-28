@@ -2,8 +2,10 @@
   <BehaviorTree ID="MainTree">  
     
     <Fallback>
-      
       <PipelineSequence>
+        <SingleTrigger>
+          <ClearEntireCostmap name="ClearCarCostmap-Context" service_name="/car_costmap/clear_entirely_car_costmap" />
+        </SingleTrigger>        
         <RateController hz="1">
           <Inverter>
             <FindCarAvoidancePoint polygons="{polygons}" car_pose="{car_pose}" car_size="{car_size}" free_point="{free_point}" goal="{goal}" state="{state}" />
