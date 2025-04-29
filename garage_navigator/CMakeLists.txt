@@ -74,13 +74,19 @@ ament_target_dependencies(test_action
   ${dependencies}
 )
 
+# nav_through_poses test node
+add_executable(test_nav_through_poses src/navigate_through_poses_test.cpp)
+ament_target_dependencies(test_nav_through_poses
+  ${dependencies}
+)
+
 install(TARGETS ${library_name}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
 )
 
-install(TARGETS ${executable_name} test_action
+install(TARGETS ${executable_name} test_action test_nav_through_poses
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
