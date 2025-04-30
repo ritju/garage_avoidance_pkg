@@ -9,6 +9,8 @@
 #include "garage_utils_msgs/action/garage_vehicle_avoidance.hpp"
 #include <nlohmann/json.hpp>
 #include "geometry_msgs/msg/polygon.hpp"
+#include "garage_utils_msgs/msg/polygons.hpp"
+#include "visualization_msgs/msg/marker_array.hpp"
 
 using namespace std::chrono_literals;
 using NavigateThroughPoses = nav2_msgs::action::NavigateThroughPoses;
@@ -19,9 +21,11 @@ public:
   NavThroughPosesClient(int total_executions) 
   : Node("nav_through_poses_client"), total_executions_(total_executions) 
   {
+    polygons_pub_ = this->create_publisher<garage_utils_msgs::msg::Polygons>("garage_polygons", rclcpp::QoS(1).reliable().transient_local());
+    polygons_visualization_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("rects_visualization", rclcpp::QoS(5).reliable().transient_local());
     init_params();
     client_nav_throuth_poses_ = rclcpp_action::create_client<NavigateThroughPoses>(this, "navigate_through_poses");
-    initialize_poses();
+    initialize_poses();    
 
     client_garage_ = rclcpp_action::create_client<garage_utils_msgs::action::GarageVehicleAvoidance>(
                 this, "/garage_vehicle_avoidance");
@@ -294,6 +298,40 @@ private:
       rects.push_back(polygon_tmp);
     }
 
+    // pub polygons_visualization msg
+    visualization_msgs::msg::Marker msg;
+    msg.header.frame_id = "map";
+    msg.header.stamp = now();
+    msg.ns = "test";
+    msg.id = 0;
+    msg.type = visualization_msgs::msg::Marker::LINE_LIST;
+    msg.action = 0;
+    msg.scale.x = 0.1;
+    msg.color.r = 0.0;
+    msg.color.g = 0.0;
+    msg.color.b = 1.0;
+    msg.color.a = 1.0;
+    for (size_t i = 0; i < rects.size(); i++)
+    {                
+            for (int j = 0; j < 4; j++)
+            {
+                    geometry_msgs::msg::Point p_start;
+                    p_start.x = rects[i][j][0];
+                    p_start.y = rects[i][j][1];
+                    p_start.z = 0.0;
+                    msg.points.push_back(p_start);
+                    geometry_msgs::msg::Point p_end;
+                    p_end.x = rects[i][(j+1)%4][0];
+                    p_end.y = rects[i][(j+1)%4][1];
+                    p_end.z = 0.0;
+                    msg.points.push_back(p_end);
+            }
+    }
+    
+    polygons_visualization_pub_->publish(msg);
+
+    // pub polygons msg
+    garage_utils_msgs::msg::Polygons polygons_msg;
     for (size_t i = 0; i < rects.size(); i++)
     {
       geometry_msgs::msg::Polygon polygon;
@@ -305,7 +343,12 @@ private:
               polygon.points.push_back(point);
       }
       polygons_.push_back(polygon);
+      polygons_msg.polygons.push_back(polygon);
     }
+
+    // publish polygons msg
+    RCLCPP_INFO(get_logger(), "publish garage_polygons topic one time ...");
+    polygons_pub_->publish(polygons_msg);
   }
 
   rclcpp_action::Client<NavigateThroughPoses>::SharedPtr client_nav_throuth_poses_;  
@@ -328,6 +371,10 @@ private:
   // subs
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr is_car_passable_sub_;
   rclcpp::Subscription<capella_ros_msg::msg::CarDetectArray>::SharedPtr car_information_sub_;
+
+  // pubs
+  rclcpp::Publisher<garage_utils_msgs::msg::Polygons>::SharedPtr polygons_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr polygons_visualization_pub_;
 
   bool is_car_passable_{true};
   capella_ros_msg::msg::CarDetectArray car_informations_;
