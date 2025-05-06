@@ -50,7 +50,7 @@ public:
 
   void execute_loop()
   {
-    if (loop_count_ > total_executions_)
+    if (loop_count_ > total_executions_ - 1)
     {
       RCLCPP_INFO(get_logger(), "Completed loops.");
       timer_loop_->cancel();
@@ -59,6 +59,8 @@ public:
 
     if (!nav_through_poses_action_executing && !garage_action_executing)
     {
+      RCLCPP_INFO(this->get_logger(), "========== Starting execution %d/%d ==========", 
+                loop_count_+1, total_executions_);;
       execute_nav_through_pose_action();
     }
   }
@@ -74,7 +76,20 @@ public:
     }
 
     auto goal_msg = NavigateThroughPoses::Goal();
-    goal_msg.poses = navigation_through_poses_;
+    std::vector<geometry_msgs::msg::PoseStamped> smart_poses;
+    for (size_t i = 0; i < navigation_through_poses_.size(); i++)
+    {
+      size_t index = (i + loop_count_) % navigation_through_poses_.size();
+      smart_poses.push_back(navigation_through_poses_[index]);
+      RCLCPP_INFO(get_logger(), "index: %zd", index);
+    }
+
+    // just for test, shall delete
+    // nav_through_poses_action_executing = false;
+    // loop_count_++;
+    // return;
+
+    goal_msg.poses = smart_poses;
     goal_msg.behavior_tree = nav_through_poses_bt_tree_;
 
     auto send_goal_options = rclcpp_action::Client<NavigateThroughPoses>::SendGoalOptions();
@@ -151,7 +166,10 @@ public:
     // send_goal_options.feedback_callback = std::bind(&NavThroughPosesClient::garage_feedback_callback, this, std::placeholders::_1, std::placeholders::_2);
     
     RCLCPP_INFO(get_logger(), "Sending goal for garage avoidance ...");
-    RCLCPP_INFO(get_logger(), "car pose: (%f, %f)", goal_msg.cars_information.results[0].pose.pose.x, goal_msg.cars_information.results[0].pose.pose.y);
+    if (car_informations_.results.size() > 0)
+    {
+      RCLCPP_INFO(get_logger(), "car pose: (%f, %f)", goal_msg.cars_information.results[0].pose.pose.position.x, goal_msg.cars_information.results[0].pose.pose.position.y);
+    }
     RCLCPP_INFO(get_logger(), "polygons size: %ld", goal_msg.polygons.size());
     client_garage_->async_send_goal(goal_msg, send_goal_options);    
 

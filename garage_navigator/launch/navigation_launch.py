@@ -93,17 +93,6 @@ def generate_launch_description():
     load_nodes = GroupAction(
         condition=IfCondition(PythonExpression(['not ', use_composition])),
         actions=[
-            
-            Node(
-                package='robot_avoidance',
-                executable='robot_avoidance',
-                name='robot_avoidance_node',
-                output='screen',
-                respawn=use_respawn,
-                respawn_delay=2.0,
-                parameters=[nav2_param_file],
-                arguments=['--ros-args', '--log-level', log_level],
-                remappings=remappings),
             Node(
                 package='garage_navigator',
                 executable='bt_garage_navigator',
