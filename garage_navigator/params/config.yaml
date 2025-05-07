@@ -1,7 +1,7 @@
 bt_garage_navigator:
   ros__parameters:
     use_sim: false
-    default_nav_garage_avoidance_bt_xml: /workspaces/capella_ros_docker/install/share/garage_navigator/behavior_trees/garage3.xml
+    default_nav_garage_avoidance_bt_xml: /workspaces/capella_ros_docker/install/share/garage_navigator/behavior_trees/garage_vehicle_avoidance.xml
     plugin_lib_names:
       - "compute_right_edge_path_action"
       - "find_car_avoidance_point_action"
@@ -85,11 +85,11 @@ test_garage_action_client:
     car_size: [3.0, 0.6, 1.0]
     car_coord: [3.0, -7.0]
     polygons:
-      # - "[[4.5, -6.0],[4.0, 0.0],[2.0, 0.0],[2.5, -6.0]]"           # 一楼3通道 begin
-      # - "[[4.5, -6.0],[4.5, -8.0],[-6.0, -8.0],[-6.0, -6.0]]"
-      # - "[[2.0, 1.5],[-5.0,1.5],[-5.0, -2.0],[2.0, -2.0]]"         # 一楼3通道 end
+      - "[[4.5, -6.0],[4.0, 0.0],[2.0, 0.0],[2.5, -6.0]]"           # 一楼3通道 begin
+      - "[[4.5, -6.0],[4.5, -8.0],[-6.0, -8.0],[-6.0, -6.0]]"
+      - "[[2.0, 1.5],[-5.0,1.5],[-5.0, -2.0],[2.0, -2.0]]"         # 一楼3通道 end
       # - "[[-8.7, 9.3], [-6.5, 11.5], [18.5, -16.0], [16.2,-18.1]]"  # -1楼3米通道
-      - "[[-9.26, 8.65], [-6.5, 11.5], [18.5, -16.0], [15.54,-18.64]]" # -1楼4米通道
+      # - "[[-9.26, 8.65], [-6.5, 11.5], [18.5, -16.0], [15.54,-18.64]]" # -1楼4米通道
       # - "[[-10.17, 7.58], [-5.5, 11.7], [8.43, -3.98], [4.0,-7.42]]"    # -1楼6米2通道直角 begin
       # - "[[5.94, -0.79], [11.88, 4.01], [14.27, 0.93], [8.74,-3.62]]"   # -1楼6米2通道直角 end
       # - "[[-10.17, 7.58], [-5.5, 11.7], [8.43, -3.98], [4.0,-7.42]]"    # -1楼6米2通道锐角 begin

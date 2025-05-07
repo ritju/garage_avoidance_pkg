@@ -89,6 +89,19 @@ GarageVehicleAvoidanceNavigator::goalReceived(ActionT::Goal::ConstSharedPtr goal
     return false;
   }
 
+  if (goal->polygons.size() == 0)
+  {
+    RCLCPP_ERROR(logger_, "goal->polygons.size() == 0");
+    return false;
+  }
+
+  if (goal->cars_information.results.size() == 0)
+  {
+    RCLCPP_ERROR(logger_, "goal->cars_information.results.size() == 0");
+    return false;
+  }
+  
+
   initializeGoalPose(goal);
 
   return true;

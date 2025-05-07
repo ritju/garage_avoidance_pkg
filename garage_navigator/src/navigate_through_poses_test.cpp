@@ -20,10 +20,7 @@ class NavThroughPosesClient : public rclcpp::Node {
 public:
   NavThroughPosesClient(int total_executions) 
   : Node("nav_through_poses_client"), total_executions_(total_executions) 
-  {
-    // timer_check_is_car_passable_ = this->create_wall_timer(
-    //   std::chrono::milliseconds(100), std::bind(&NavThroughPosesClient::timer_callback, this));
-     
+  {     
     polygons_pub_ = this->create_publisher<garage_utils_msgs::msg::Polygons>("garage_polygons", rclcpp::QoS(1).reliable().transient_local());
     polygons_visualization_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("rects_visualization", rclcpp::QoS(5).reliable().transient_local());
     init_params();
@@ -111,7 +108,9 @@ public:
       [this](rclcpp_action::ClientGoalHandle<nav2_msgs::action::NavigateThroughPoses>::SharedPtr,
         const std::shared_ptr<const nav2_msgs::action::NavigateThroughPoses::Feedback> )
         {
-          if (!is_car_passable_)
+          // RCLCPP_INFO(this->get_logger(), "%d", (int)(this->now().get_clock_type()));
+          // RCLCPP_INFO(this->get_logger(), "%d", (int)(last_time_received_car_informations_.get_clock_type()));
+          if (!is_car_passable_ && (this->get_clock()->now() - last_time_received_car_informations_).seconds() < tolerance_time)
           {
             RCLCPP_INFO(this->get_logger(), "is_car_passable_ value is false, canceling Action nav_through_poses");
             auto cancel_future = client_nav_throuth_poses_->async_cancel_all_goals();
@@ -189,23 +188,7 @@ public:
   void car_information_callback(const capella_ros_msg::msg::CarDetectArray::SharedPtr msg)
   {
     car_informations_ = *msg;
-  }
-
-  void run() {
-    if (!client_nav_throuth_poses_->wait_for_action_server(10s)) {
-      RCLCPP_ERROR(this->get_logger(), "Action server not available after waiting");
-      return;
-    }
-
-    for (int i = 0; i < total_executions_; ++i) {
-      RCLCPP_INFO(this->get_logger(), "========== Starting execution %d/%d ==========", 
-                i+1, total_executions_);
-      if (!execute_navigation_cycle()) {
-        RCLCPP_ERROR(this->get_logger(), "Navigation cycle %d failed", i+1);
-      }
-      RCLCPP_INFO(this->get_logger(), "========== Completed execution %d/%d ==========\n", 
-                i+1, total_executions_);
-    }
+    last_time_received_car_informations_ = this->get_clock()->now();
   }
 
 private:
@@ -378,52 +361,6 @@ private:
     loop_count_++;
   }
 
-  void timer_callback()
-  {
-    // RCLCPP_INFO(get_logger(), "timer_callback");
-    // RCLCPP_INFO(get_logger(), 
-    //   "timer_callback => is_car_passable: %s, nav_through_poses_action_executing: %s, cancel_nav_through_poses_: %s",
-    //   is_car_passable_ ? "true" : "false",
-    //   nav_through_poses_action_executing ? "true" : "false",
-    //   cancel_nav_through_poses_ ? "true" : "false");
-    if (!is_car_passable_ && !cancel_nav_through_poses_)
-    {
-      if (nav_through_poses_action_executing  && !cancel_nav_through_poses_)
-      {
-        cancel_nav_through_poses_ = true;
-        // timer_check_is_car_passable_.reset();
-        client_nav_throuth_poses_->async_cancel_goal(navigate_through_poses_goal_handle, [this](rclcpp_action::Client<nav2_msgs::action::NavigateThroughPoses>::CancelResponse::SharedPtr cancel_response)
-          {
-            RCLCPP_INFO(get_logger(), "cancel nav_through_poses action response_call_back");
-            (void) cancel_response;
-            cancel_nav_through_poses_ = false;
-            auto goal_msg = garage_utils_msgs::action::GarageVehicleAvoidance::Goal();
-            goal_msg.cars_information = car_informations_;
-            goal_msg.polygons = polygons_;
-            
-            auto send_goal_options = rclcpp_action::Client<garage_utils_msgs::action::GarageVehicleAvoidance>::SendGoalOptions();
-            send_goal_options.goal_response_callback = std::bind(&NavThroughPosesClient::garage_goal_response_callback, this, std::placeholders::_1);
-            send_goal_options.result_callback = std::bind(&NavThroughPosesClient::garage_result_callback, this, std::placeholders::_1);
-            send_goal_options.feedback_callback = std::bind(&NavThroughPosesClient::garage_feedback_callback, this, std::placeholders::_1, std::placeholders::_2);
-            if (!client_garage_->wait_for_action_server(1s))
-            {
-              RCLCPP_ERROR(get_logger(), "garage action is not online!");
-            }
-            else
-            {
-              RCLCPP_INFO(get_logger(), "Sending goal for garage avoidance ...");
-              client_garage_->async_send_goal(goal_msg, send_goal_options);
-            }          
-          });
-      }
-      else
-      {
-        RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 1000, "waiting for cancel nav_through_poses ...");
-      }
-      
-    }
-  }
-
   std::vector<std::vector<double>> parse_json_array(const std::string& json_str) 
   {
     auto json = nlohmann::json::parse(json_str);
@@ -538,8 +475,6 @@ private:
   std::vector<std::string> polygons_vec_;
   std::string nav_through_poses_bt_tree_;
 
-  // timer for check is_car_passable_
-  rclcpp::TimerBase::SharedPtr timer_check_is_car_passable_;
   rclcpp::TimerBase::SharedPtr timer_loop_;
 
   // subs
@@ -552,6 +487,8 @@ private:
 
   bool is_car_passable_{true};
   capella_ros_msg::msg::CarDetectArray car_informations_;
+  rclcpp::Time last_time_received_car_informations_;
+  double tolerance_time = 2.0;
   bool garage_action_executing{false};
   bool nav_through_poses_action_executing{false};
   bool cancel_nav_through_poses_{false};
@@ -567,7 +504,6 @@ int main(int argc, char ** argv) {
   const int TOTAL_EXECUTIONS = 3000;
   
   auto node = std::make_shared<NavThroughPosesClient>(TOTAL_EXECUTIONS);
-  // node->run();
   
   rclcpp::spin(node);
   rclcpp::shutdown();
