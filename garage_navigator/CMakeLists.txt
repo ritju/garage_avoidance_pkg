@@ -74,6 +74,12 @@ ament_target_dependencies(test_action
   ${dependencies}
 )
 
+# polygons_markers_pub node
+add_executable(publisher_polygons_marker src/pub_polygons_markers.cpp)
+ament_target_dependencies(publisher_polygons_marker
+  ${dependencies}
+)
+
 # nav_through_poses test node
 add_executable(test_nav_through_poses src/navigate_through_poses_test.cpp)
 ament_target_dependencies(test_nav_through_poses
@@ -86,7 +92,7 @@ install(TARGETS ${library_name}
   RUNTIME DESTINATION bin
 )
 
-install(TARGETS ${executable_name} test_action test_nav_through_poses
+install(TARGETS ${executable_name} test_action test_nav_through_poses publisher_polygons_marker
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
