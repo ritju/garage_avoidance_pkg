@@ -74,6 +74,12 @@ ament_target_dependencies(test_action
   ${dependencies}
 )
 
+# test for /global_costmap
+add_executable(test_global_costmap src/sub_global_costmap.cpp)
+ament_target_dependencies(test_global_costmap
+  ${dependencies}
+)
+
 # polygons_markers_pub node
 add_executable(publisher_polygons_marker src/pub_polygons_markers.cpp)
 ament_target_dependencies(publisher_polygons_marker
@@ -92,7 +98,7 @@ install(TARGETS ${library_name}
   RUNTIME DESTINATION bin
 )
 
-install(TARGETS ${executable_name} test_action test_nav_through_poses publisher_polygons_marker
+install(TARGETS ${executable_name} test_action test_nav_through_poses publisher_polygons_marker test_global_costmap
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
