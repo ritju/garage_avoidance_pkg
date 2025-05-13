@@ -2,7 +2,7 @@
 
 robot_avoidance_node:
   ros__parameters:
-    safe_width_threshold: 0.6
+    safe_width_threshold: 0.01
     start_end_path_threshold: 2.0
     car_size_threshold: 1.0
 
