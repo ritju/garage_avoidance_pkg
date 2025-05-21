@@ -19,11 +19,24 @@ garage_navigator_pkg = get_package_share_directory("garage_navigator")
 
 all_servers = IncludeLaunchDescription(
                         PythonLaunchDescriptionSource([garage_navigator_pkg, '/launch','/servers.launch.py']))
+
 garage_navigation = IncludeLaunchDescription(
                         PythonLaunchDescriptionSource([garage_navigator_pkg, '/launch','/navigation_launch.py']))
 
+
+robot_avoidance_params_file_path = os.path.join(garage_navigator_pkg, "params", "dsf_nav2_for_ad_4_exhibition.yaml")
+robot_avoidance = Node(
+                        executable='robot_avoidance',
+                        package='robot_avoidance',
+                        name='robot_avoidance',
+                        namespace='',
+                        output='screen',
+                        parameters=[robot_avoidance_params_file_path],
+                )
+
 def generate_launch_description():
         return LaunchDescription([
+                robot_avoidance,
                 all_servers,
-                garage_navigation
+                garage_navigation,
         ])

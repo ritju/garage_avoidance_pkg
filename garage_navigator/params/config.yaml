@@ -1,5 +1,6 @@
 bt_garage_navigator:
   ros__parameters:
+    default_server_timeout: 10000
     use_sim: false
     # default_nav_garage_avoidance_bt_xml: /workspaces/capella_ros_docker/install/share/garage_navigator/behavior_trees/garage_vehicle_avoidance.xml
     default_nav_garage_avoidance_bt_xml: /capella/share/capella_ros_launcher/behavior_trees/garage_vehicle_avoidance.xml 

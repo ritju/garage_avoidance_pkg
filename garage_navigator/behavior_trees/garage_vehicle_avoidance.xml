@@ -3,9 +3,6 @@
     
     <Fallback>
       <PipelineSequence>
-        <!-- <SingleTrigger>
-          <ClearEntireCostmap name="ClearCarCostmap-Context" service_name="/car_costmap/clear_entirely_car_costmap" />
-        </SingleTrigger>         -->
         <RateController hz="1">
           <Inverter>
             <FindCarAvoidancePoint polygons="{polygons}" car_pose="{car_pose}" car_size="{car_size}" free_point="{free_point}" goal="{goal}" state="{state}" />
@@ -27,70 +24,109 @@
   </BehaviorTree>
 
   <BehaviorTree ID="NavigateThroughPoses">
-    <RecoveryNode number_of_retries="6" name="NavigateRecovery">
+    <RecoveryNode number_of_retries="12" name="NavigateRecovery">
       <PipelineSequence name="NavigateWithReplanning">
-        <RateController hz="10">
-          <RecoveryNode number_of_retries="1" name="ComputePathThroughPoses">
-            <ReactiveSequence>
-              <RemovePassedGoals input_goals="{goals}" output_goals="{goals}" radius="0.7"/>
-              <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="GridBased"/>
-            </ReactiveSequence>
-            <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>
-          </RecoveryNode>
+        <RateController hz="1.0">
+          <IsPedestrianFront pedestrain_distance = "2.0"/>
         </RateController>
-        <RecoveryNode number_of_retries="1" name="FollowPath">
+        <RateController hz="5.0">
+          <IsCollision/>
+        </RateController>
+        <RateController hz="10.0">
+          <RemovePassedGoals input_goals="{goals}" output_goals="{goals}" radius="1.0"/>
+        </RateController>
+        <SingleTrigger>
+          <RecoveryNode number_of_retries="2" name="ComputePathThroughPoses">
+            <Sequence>
+              <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="2.0"/>
+              <Wait wait_duration="0.5"/>
+              <IsPathValid goals="{goals}" check_distance="10000.0"/>
+              <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="GridBased"/>
+            </Sequence>
+            <Sequence>
+              <Wait wait_duration="0.5"/>
+              <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="2.0"/>
+              <Wait wait_duration="0.5"/>
+              <Fallback>
+                <IsPathValid goals="{goals}" check_distance="10000.0"/>
+                <PathCheck check_distance="10000.0"/>
+              </Fallback>
+              <Wait wait_duration="0.5"/>
+            </Sequence>
+          </RecoveryNode>
+        </SingleTrigger>
+        <RecoveryNode number_of_retries="2" name="FollowPath">
           <FollowPath path="{path}" controller_id="FollowPath"/>
-          <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
+          <Sequence>
+            <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="local_costmap/clear_except_local_costmap" reset_distance="2.0"/>
+            <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="2.0"/>
+            <Wait wait_duration="0.5"/>
+            <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="GridBased"/>
+          </Sequence>
         </RecoveryNode>
       </PipelineSequence>
       <ReactiveFallback name="RecoveryFallback">
         <GoalUpdated/>
-        <RoundRobin name="RecoveryActions">
-          <Sequence name="ClearingActions">
-            <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
-            <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
-          </Sequence>
-        </RoundRobin>
+        <Sequence name="RecoveryActions">
+          <Wait wait_duration="0.5"/>
+          <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="local_costmap/clear_except_local_costmap" reset_distance="2.0"/>
+          <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="2.0"/>
+          <Wait wait_duration="0.5"/>
+          <Fallback>
+            <IsCollision/>
+            <CollisionRecover/>
+          </Fallback>
+          <Wait wait_duration="0.5"/>
+        </Sequence>
       </ReactiveFallback>
     </RecoveryNode>
   </BehaviorTree>
 
   <BehaviorTree ID="NavigatoToPose">
-    <Sequence name="clear_costmap_after_goal_reached">
-      <RecoveryNode number_of_retries="1000000" name="NavigateRecovery">
-        <PipelineSequence name="NavigateWithReplanning">
-            <!-- <GoalUpdatedController>
-              <ClearEntireCostmap name="ClearGlobalCostmap-Subtree"  service_name="global_costmap/clear_entirely_global_costmap"/>
-            </GoalUpdatedController> -->
-            <RateController hz="5.0">
-              <RecoveryNode number_of_retries="10" name="ComputePathToPose">
-                <Sequence>
-                  <ComputePathToPose goal="{free_point}" path="{path}" planner_id="GridBased"/>
-                </Sequence> 
-                <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>
-              </RecoveryNode>
-            </RateController>
-          <RecoveryNode number_of_retries="10" name="FollowPath">               
-              <FollowPath path="{path}" controller_id="FollowPath"/>
-              <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
-          </RecoveryNode>
-        </PipelineSequence>
-        <ReactiveFallback name="RecoveryFallback">
-          <GoalUpdated/>
-          <Sequence name="RecoveryActions">
-            <Sequence name="ClearingActions">
-              <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
-              <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
+    <RecoveryNode number_of_retries="6" name="NavigateRecovery">
+      <PipelineSequence name="NavigateWithReplanning">
+        <RecoveryNode number_of_retries="1" name="ComputePathToPose">
+            <Fallback>
+              <ReactiveSequence>
+                <Inverter>
+                  <PathExpiringTimer seconds="1000" path="{path}"/>
+                </Inverter>
+                <Inverter>
+                  <GlobalUpdatedGoal/>
+                </Inverter>
+              </ReactiveSequence>
+              <Sequence>
+                 <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="2.0"/>
+                 <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
+              </Sequence>
+            </Fallback>
+            <Sequence>
+              <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="2.0"/>
             </Sequence>
-            <Wait wait_duration="2"/>
-            <!-- <BackUp backup_dist="0.10" backup_speed="0.05"/> -->
-            <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
-            <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
+          </RecoveryNode>
+        <RateController hz="5.0">
+          <IsCollision/>
+        </RateController>
+        <RecoveryNode number_of_retries="6" name="FollowPath">
+          <FollowPath path="{path}" controller_id="FollowPath"/>
+          <Sequence>
+            <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="2.0"/>
+            <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
           </Sequence>
-        </ReactiveFallback>
-      </RecoveryNode>
-      <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
-    </Sequence>
+        </RecoveryNode>
+      </PipelineSequence>
+      <ReactiveFallback name="RecoveryFallback">
+        <GoalUpdated/>
+        <Sequence name="RecoveryActions">
+          <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="local_costmap/clear_except_local_costmap" reset_distance="2.0"/>
+          <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="2.0"/>
+          <Fallback>
+            <IsCollision/>
+            <CollisionRecover/>
+          </Fallback>
+        </Sequence>
+      </ReactiveFallback>
+    </RecoveryNode>
   </BehaviorTree>
 
 
