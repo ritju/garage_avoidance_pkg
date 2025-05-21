@@ -1,42 +1,60 @@
 
 import os
-
 from ament_index_python.packages import get_package_share_directory
-
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, GroupAction, SetEnvironmentVariable
-from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration, PythonExpression
-from launch_ros.actions import LoadComposableNodes
-from launch_ros.actions import Node
-from launch.actions import RegisterEventHandler, EmitEvent
+from launch.actions import ExecuteProcess, RegisterEventHandler
 from launch.event_handlers import OnProcessStart
+from launch_ros.actions import Node
 
-from launch.actions import IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+find_free_space_pkg = get_package_share_directory("find_free_space")
+find_free_space_param_file_path = os.path.join(find_free_space_pkg, "params", "config.yaml")
+print('abc', find_free_space_param_file_path)
 
 garage_navigator_pkg = get_package_share_directory("garage_navigator")
+welt_params_file_path = os.path.join(garage_navigator_pkg, "params", "dsf_nav2_for_ad_4_exhibition.yaml")
 
-all_servers = IncludeLaunchDescription(
-                        PythonLaunchDescriptionSource([garage_navigator_pkg, '/launch','/servers.launch.py']))
+compute_right_edge_path = ExecuteProcess(
+    cmd=['ros2', 'launch', 'garage_utils', 'compute_right_edge_path.launch.py'],
+    output='screen'
+)
 
-garage_navigation = IncludeLaunchDescription(
-                        PythonLaunchDescriptionSource([garage_navigator_pkg, '/launch','/navigation_launch.py']))
+welt = ExecuteProcess(
+    cmd=['ros2', 'run', 'welt_model', 'welt_model'],
+    output='screen'
+)
 
-
-robot_avoidance_params_file_path = os.path.join(garage_navigator_pkg, "params", "dsf_nav2_for_ad_4_exhibition.yaml")
-robot_avoidance = Node(
-                        executable='robot_avoidance',
-                        package='robot_avoidance',
-                        name='robot_avoidance',
-                        namespace='',
+find_free_space = Node(
+                        package='find_free_space',
+                        executable='find_parking_space',
+                        name='find_free_space_action_server',
                         output='screen',
-                        parameters=[robot_avoidance_params_file_path],
+                        respawn_delay=2.0,
+                        parameters=[find_free_space_param_file_path]
                 )
 
+garage_navigation = ExecuteProcess(
+    cmd=['ros2', 'launch', 'garage_navigator', 'navigation_launch.py'],
+    output='screen'
+)
+
+robot_avoidance = ExecuteProcess(
+    cmd=['ros2', 'run', 'robot_avoidance', 'robot_avoidance',
+         '--params-file', welt_params_file_path],
+    output='screen'
+)
+
+delay_garage_nav = RegisterEventHandler(
+    event_handler=OnProcessStart(
+        target_action=find_free_space,
+        on_start=[garage_navigation]
+    )
+)
+
 def generate_launch_description():
-        return LaunchDescription([
-                robot_avoidance,
-                all_servers,
-                garage_navigation,
-        ])
+    return LaunchDescription([
+        robot_avoidance,
+        compute_right_edge_path,
+        find_free_space,
+        welt,
+        delay_garage_nav
+    ])
