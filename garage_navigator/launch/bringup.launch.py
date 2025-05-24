@@ -32,6 +32,15 @@ find_free_space = Node(
                         parameters=[find_free_space_param_file_path]
                 )
 
+
+pub_rect_markers = Node(
+                        package='garage_navigator',
+                        executable='publisher_polygons_marker',
+                        name='publisher_polygons_marker',
+                        output='screen',
+                        respawn_delay=2.0,
+                )
+
 garage_navigation = ExecuteProcess(
     cmd=['ros2', 'launch', 'garage_navigator', 'navigation_launch.py'],
     output='screen'
@@ -56,5 +65,6 @@ def generate_launch_description():
         compute_right_edge_path,
         find_free_space,
         welt,
+        pub_rect_markers,
         delay_garage_nav
     ])
