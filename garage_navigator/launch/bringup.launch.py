@@ -8,7 +8,7 @@ from launch_ros.actions import Node
 
 find_free_space_pkg = get_package_share_directory("find_free_space")
 find_free_space_param_file_path = os.path.join(find_free_space_pkg, "params", "config.yaml")
-print('abc', find_free_space_param_file_path)
+print('find_free_space_param_file_path:', find_free_space_param_file_path)
 
 garage_navigator_pkg = get_package_share_directory("garage_navigator")
 welt_params_file_path = os.path.join(garage_navigator_pkg, "params", "dsf_nav2_for_ad_4_exhibition.yaml")
