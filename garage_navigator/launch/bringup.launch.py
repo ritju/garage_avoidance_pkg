@@ -41,11 +41,6 @@ pub_rect_markers = Node(
                         respawn_delay=2.0,
                 )
 
-front_camera_launch = ExecuteProcess(
-    cmd=['ros2', 'launch', 'usb_cam', 'camera.launch.py '],
-    output='screen'
-)
-
 garage_navigation = ExecuteProcess(
     cmd=['ros2', 'launch', 'garage_navigator', 'navigation_launch.py'],
     output='screen'
@@ -71,6 +66,5 @@ def generate_launch_description():
         find_free_space,
         welt,
         pub_rect_markers,
-        # front_camera_launch,
         delay_garage_nav
     ])
