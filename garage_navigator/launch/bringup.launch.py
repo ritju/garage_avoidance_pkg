@@ -71,6 +71,6 @@ def generate_launch_description():
         find_free_space,
         welt,
         pub_rect_markers,
-        front_camera_launch,
+        # front_camera_launch,
         delay_garage_nav
     ])
