@@ -47,6 +47,16 @@ GarageVehicleAvoidanceNavigator::configure(
   }
   state_id_ = node->get_parameter("state_id").as_string();
 
+  if (!node->has_parameter("nav2pose_goal_blackboard_id")) {
+    node->declare_parameter("nav2pose_goal_blackboard_id", std::string("goal"));
+  }
+  nav2pose_goal_blackboard_id_ = node->get_parameter("nav2pose_goal_blackboard_id").as_string();
+
+  if (!node->has_parameter("nav2pose_path_blackboard_id")) {
+    node->declare_parameter("nav2pose_path_blackboard_id", std::string("path"));
+  }
+  nav2pose_path_blackboard_id_ = node->get_parameter("nav2pose_path_blackboard_id").as_string();
+
   return true;
 }
 
@@ -186,6 +196,10 @@ GarageVehicleAvoidanceNavigator::initializeGoalPose(ActionT::Goal::ConstSharedPt
   blackboard->set<geometry_msgs::msg::Vector3>(car_size_blackboard_id_, goal->cars_information.results[0].size);
   // RCLCPP_INFO(logger_, "initializeGoalPose set state: %d", garage_utils_msgs::msg::State::INIT);
   blackboard->set<uint8_t>(state_id_, garage_utils_msgs::msg::State::INIT);
+  blackboard->set<nav_msgs::msg::Path>(path_blackboard_id_, nav_msgs::msg::Path());
+  blackboard->set<std::vector<geometry_msgs::msg::PoseStamped>>(goals_blackboard_id_, std::vector<geometry_msgs::msg::PoseStamped>());
+  blackboard->set<geometry_msgs::msg::PoseStamped>(nav2pose_goal_blackboard_id_, geometry_msgs::msg::PoseStamped());
+  blackboard->set<nav_msgs::msg::Path>(nav2pose_path_blackboard_id_, nav_msgs::msg::Path());
 }
 
 }  // namespace garage_utils_pkg

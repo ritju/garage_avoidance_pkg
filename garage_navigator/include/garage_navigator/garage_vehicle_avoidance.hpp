@@ -10,6 +10,8 @@
 
 #include "garage_utils_msgs/action/garage_vehicle_avoidance.hpp"
 #include "garage_utils_msgs/msg/state.hpp"
+#include "nav_msgs/msg/path.hpp"
+#include "geometry_msgs/msg/pose_stamped.hpp"
 
 namespace garage_utils_pkg
 {
@@ -104,10 +106,12 @@ protected:
 
   std::string polygons_blackboard_id_;
   std::string car_pose_blackboard_id_;
-  std::string path_blackboard_id_;
   std::string car_size_blackboard_id_;
   std::string state_id_;
+  std::string path_blackboard_id_;
   std::string goals_blackboard_id_;
+  std::string nav2pose_goal_blackboard_id_;
+  std::string nav2pose_path_blackboard_id_;
 
 };
 
