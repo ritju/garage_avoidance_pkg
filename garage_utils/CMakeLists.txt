@@ -17,6 +17,7 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(capella_ros_msg REQUIRED)
+find_package(nav2_util REQUIRED)
 set(dependencies 
   rclcpp
   rclcpp_action
@@ -28,6 +29,7 @@ set(dependencies
   tf2
   tf2_ros
   capella_ros_msg
+  nav2_util
   )
 
 if(BUILD_TESTING)
@@ -96,11 +98,18 @@ target_include_directories(test_compute_right_edge_path PUBLIC
 target_link_libraries(test_compute_right_edge_path generate_path shortest_path_search)
 ament_target_dependencies(test_compute_right_edge_path ${dependencies})
 
+add_executable(test_find_car_avoidance_point src/test_find_car_avoidance_point.cpp)
+target_include_directories(test_find_car_avoidance_point PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+ament_target_dependencies(test_find_car_avoidance_point ${dependencies})
+
 install(TARGETS
   compute_right_edge_path_server       test_compute_right_edge_path
   generate_model                       test_generate_model 
   shortest_path_search                 test_shortest_path_search generate_path 
   generate_path                        test_generate_path  
+  test_find_car_avoidance_point
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
@@ -109,7 +118,7 @@ install(DIRECTORY launch params
   DESTINATION share/${PROJECT_NAME}
   )
 
-install(TARGETS test_generate_model test_shortest_path_search test_generate_path test_compute_right_edge_path
+install(TARGETS test_generate_model test_shortest_path_search test_generate_path test_compute_right_edge_path test_find_car_avoidance_point
 DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
