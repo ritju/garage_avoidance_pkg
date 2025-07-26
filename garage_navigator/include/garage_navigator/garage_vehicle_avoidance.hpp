@@ -112,6 +112,8 @@ protected:
   std::string goals_blackboard_id_;
   std::string nav2pose_goal_blackboard_id_;
   std::string nav2pose_path_blackboard_id_;
+  std::string is_car_moving_car_distance_thr_id_;
+  std::string is_car_moving_time_predict_id_;
 
 };
 

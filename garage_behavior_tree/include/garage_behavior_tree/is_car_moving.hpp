@@ -10,6 +10,12 @@
 #include "std_msgs/msg/bool.hpp"
 #include "behaviortree_cpp_v3/condition_node.h"
 #include "capella_ros_msg/msg/car_detect_array.hpp"
+#include "tf2_ros/buffer.h"
+#include "tf2_ros/transform_listener.h"
+#include "tf2/utils.h"
+#include "nav2_util/robot_utils.hpp"
+#include "geometry_msgs/msg/pose_stamped.hpp"
+
 
 namespace garage_utils_pkg
 {
@@ -45,16 +51,23 @@ public:
 
 private:
   /**
-   * @brief Callback function for localization_score topic
+   * @brief Callback function 
    * @param msg Shared pointer to std_msgs::msg::Float32 message
    */
-  void iscollisionCallback(capella_ros_msg::msg::CarDetectArray::SharedPtr msg);
+  void carInformationCallback(capella_ros_msg::msg::CarDetectArray::SharedPtr msg);
   rclcpp::Node::SharedPtr node_;
   rclcpp::CallbackGroup::SharedPtr callback_group_;
   rclcpp::executors::SingleThreadedExecutor callback_group_executor_;
   rclcpp::Subscription<capella_ros_msg::msg::CarDetectArray>::SharedPtr car_info_sub;
   std::string is_collision_topic_;
   bool is_moving_ = false;
+  std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+  std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+  geometry_msgs::msg::PoseStamped robot_pose;
+  double car_distance_thr_;
+  double time_predict_;
+  double car_speed_linear_x;
+  double robot_x, robot_y, robot_theta, car_x, car_y;
 };
 
 }  // namespace nav2_behavior_tree

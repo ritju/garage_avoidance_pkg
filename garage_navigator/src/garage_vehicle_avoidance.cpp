@@ -57,6 +57,16 @@ GarageVehicleAvoidanceNavigator::configure(
   }
   nav2pose_path_blackboard_id_ = node->get_parameter("nav2pose_path_blackboard_id").as_string();
 
+  if (!node->has_parameter("is_car_moving_car_distance_thr_id")) {
+    node->declare_parameter("is_car_moving_car_distance_thr_id", std::string("is_car_moving_car_distance_thr_id"));
+  }
+  is_car_moving_car_distance_thr_id_ = node->get_parameter("is_car_moving_car_distance_thr_id").as_string();
+
+  if (!node->has_parameter("is_car_moving_time_predict_id")) {
+    node->declare_parameter("is_car_moving_time_predict_id", std::string("is_car_moving_time_predict_id"));
+  }
+  is_car_moving_time_predict_id_ = node->get_parameter("is_car_moving_time_predict_id").as_string();
+  
   return true;
 }
 
@@ -200,6 +210,8 @@ GarageVehicleAvoidanceNavigator::initializeGoalPose(ActionT::Goal::ConstSharedPt
   blackboard->set<std::vector<geometry_msgs::msg::PoseStamped>>(goals_blackboard_id_, std::vector<geometry_msgs::msg::PoseStamped>());
   blackboard->set<geometry_msgs::msg::PoseStamped>(nav2pose_goal_blackboard_id_, geometry_msgs::msg::PoseStamped());
   blackboard->set<nav_msgs::msg::Path>(nav2pose_path_blackboard_id_, nav_msgs::msg::Path());
+  blackboard->set<double>(is_car_moving_car_distance_thr_id_, 4.0);
+  blackboard->set<double>(is_car_moving_time_predict_id_, 3.0);
 }
 
 }  // namespace garage_utils_pkg
