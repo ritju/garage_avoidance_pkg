@@ -13,6 +13,11 @@
 #include "nav_msgs/msg/path.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 
+#include "garage_utils_msgs/action/lookup_vacant_parking_space.hpp"
+#include "garage_utils_msgs/action/compute_right_edge_path.hpp"
+#include "capella_ros_msg/action/welt.hpp"
+#include "nav2_msgs/action/wait.hpp"
+
 namespace garage_utils_pkg
 {
 

@@ -66,6 +66,35 @@ GarageVehicleAvoidanceNavigator::configure(
     node->declare_parameter("is_car_moving_time_predict_id", std::string("is_car_moving_time_predict_id"));
   }
   is_car_moving_time_predict_id_ = node->get_parameter("is_car_moving_time_predict_id").as_string();
+
+  auto tmp_action_client_find_ = rclcpp_action::create_client<garage_utils_msgs::action::LookupVacantParkingSpace>(node, "tmp_client_find");
+  auto tmp_action_client_compute_ = rclcpp_action::create_client<garage_utils_msgs::action::ComputeRightEdgePath>(node, "tmp_client_compute");
+  auto tmp_action_client_welt_ = rclcpp_action::create_client<capella_ros_msg::action::Welt>(node, "tmp_client_welt");
+  auto tmp_action_client_wait_ = rclcpp_action::create_client<nav2_msgs::action::Wait>(node, "tmp_client_wait");
+
+  if (!tmp_action_client_find_->wait_for_action_server(std::chrono::seconds(10)))
+  {
+    RCLCPP_ERROR(node->get_logger(), "Action /find_car_avoidance_point_action is not on line after 10 seconds.");
+    return false;
+  }
+
+  if (!tmp_action_client_compute_->wait_for_action_server(std::chrono::seconds(10)))
+  {
+    RCLCPP_ERROR(node->get_logger(), "Action /compute_right_edge_path_action_server is not on line after 10 seconds.");
+    return false;
+  }
+
+  if (!tmp_action_client_welt_->wait_for_action_server(std::chrono::seconds(10)))
+  {
+    RCLCPP_ERROR(node->get_logger(), "Action /welt_model_node is not on line after 10 seconds.");
+    return false;
+  }
+
+  if (!tmp_action_client_wait_->wait_for_action_server(std::chrono::seconds(10)))
+  {
+    RCLCPP_ERROR(node->get_logger(), "Action /wait is not on line after 10 seconds.");
+    return false;
+  }
   
   return true;
 }
