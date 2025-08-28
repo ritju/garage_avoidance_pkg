@@ -13,7 +13,7 @@
 #include "nav_msgs/msg/path.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 
-#include "garage_utils_msgs/action/lookup_vacant_parking_space.hpp"
+#include "capella_ros_msg/action/find_car_avoidance_point.hpp"
 #include "garage_utils_msgs/action/compute_right_edge_path.hpp"
 #include "capella_ros_msg/action/welt.hpp"
 #include "nav2_msgs/action/wait.hpp"
