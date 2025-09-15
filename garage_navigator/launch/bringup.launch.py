@@ -5,6 +5,8 @@ from launch import LaunchDescription
 from launch.actions import ExecuteProcess, RegisterEventHandler
 from launch.event_handlers import OnProcessStart
 from launch_ros.actions import Node
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 find_free_space_pkg = get_package_share_directory("find_free_space")
 find_free_space_param_file_path = os.path.join(find_free_space_pkg, "params", "config.yaml")
@@ -31,6 +33,10 @@ find_free_space = Node(
                         respawn_delay=2.0,
                         parameters=[find_free_space_param_file_path]
                 )
+
+find_free_space_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(find_free_space_pkg, 'launch', 'find_free_space.launch.py'))
+    )
 
 
 pub_rect_markers = Node(
@@ -63,8 +69,10 @@ def generate_launch_description():
     return LaunchDescription([
         robot_avoidance,
         compute_right_edge_path,
-        find_free_space,
+        # find_free_space,
+        find_free_space_launch,
         welt,
         pub_rect_markers,
-        delay_garage_nav
+        # delay_garage_nav,
+        garage_navigation,
     ])
