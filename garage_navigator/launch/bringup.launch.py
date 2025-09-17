@@ -9,6 +9,7 @@ from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 find_free_space_pkg = get_package_share_directory("find_free_space")
+robot_avoidance_pkg = get_package_share_directory("robot_avoidance")
 find_free_space_param_file_path = os.path.join(find_free_space_pkg, "params", "config.yaml")
 print('find_free_space_param_file_path:', find_free_space_param_file_path)
 
@@ -58,6 +59,10 @@ robot_avoidance = ExecuteProcess(
     output='screen'
 )
 
+robot_avoidance_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(robot_avoidance_pkg, 'launch', 'robot_avoidance.launch.py'))
+    )
+
 delay_garage_nav = RegisterEventHandler(
     event_handler=OnProcessStart(
         target_action=find_free_space,
@@ -67,7 +72,8 @@ delay_garage_nav = RegisterEventHandler(
 
 def generate_launch_description():
     return LaunchDescription([
-        robot_avoidance,
+        # robot_avoidance,
+        robot_avoidance_launch,
         compute_right_edge_path,
         # find_free_space,
         find_free_space_launch,
