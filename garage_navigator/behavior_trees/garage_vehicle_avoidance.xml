@@ -15,7 +15,7 @@
       </PipelineSequence>
 
       <Sequence>
-        <SubTree ID="NavigatoToPose" __shared_blackboard="true" />
+        <!-- <SubTree ID="NavigatoToPose" __shared_blackboard="true" /> -->
         <WeltModelNode goal_pose="{free_point}" state="{state}" />
         <Wait wait_duration="15" />
       </Sequence>      
