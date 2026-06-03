@@ -406,6 +406,13 @@ namespace garage_utils_pkg
                         path_generator_->process_(points_ordered, this->polygons_);
                         this->path_ = path_generator_->get_path();
 
+                        // 给path添加时间戳
+                        this->path_.header.stamp = this->get_clock()->now();
+                        for (size_t i = 0; i < this->path_.poses.size(); i++)
+                        {
+                                this->path_.poses[i].header.stamp = this->get_clock()->now();
+                        }
+
                         // 4、publish path
                         this->path_pub_->publish(this->path_);
 
