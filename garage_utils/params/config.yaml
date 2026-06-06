@@ -2,11 +2,12 @@ compute_right_edge_path_action_server:
   ros__parameters:
     path_topic_name: "garage_path"
     dis_thr: 4.0
-    resolution: 2.1
     test: false
     robot_x_test: -1.0
     robot_y_test: 21.5
     strict_mode: true    #删除距离车子更近的危险路径
+    offset: 0.8          #路径距长边的偏移量，单位米
+    resolution: 1.0      #path中点与点之间的距离，单位米
 
 test_compute_right_edge_path:
   ros__parameters:

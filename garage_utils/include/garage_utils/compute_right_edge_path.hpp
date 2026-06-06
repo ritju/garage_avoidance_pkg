@@ -214,6 +214,8 @@ private:
   double robot_x_test;
   double robot_y_test;  
   bool strict_mode{true};
+  double offset_;
+  double resolution_;
 
 };  // class ComputeRightEdgePathActionServer
 

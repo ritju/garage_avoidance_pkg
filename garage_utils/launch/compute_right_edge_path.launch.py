@@ -4,7 +4,29 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.substitutions import LaunchConfiguration
 from launch.actions import DeclareLaunchArgument
+from nav2_common.launch import RewrittenYaml
 
+"""
+用于获取环境变量值
+参数
+env: 环境变量名称
+default: 环境变量为赋值时使用的默认值
+返回值
+返回最终采用的值
+"""
+def get_environment_value(env, default):
+    try:
+        if env in os.environ:
+            value = os.environ.get(env, default)
+            print(f'get {env} value: {value} from environment')
+            return value
+        else:
+            print(f"Using default {env} value: {default}.")
+            return default
+    except Exception as e:
+        print(f'exception: {str(e)}')
+        print(f"Please input {env} in environment")
+        return default
 def generate_launch_description():
     
     launch_description = LaunchDescription()
@@ -17,6 +39,23 @@ def generate_launch_description():
 
     log_level_arg = DeclareLaunchArgument('log_level', default_value='info', description='define compute_right_edge_path_action_server node log level')
 
+    # 获取环境变量值
+    off_set = get_environment_value("COMPUTE_RIGHT_EDGE_PATH_OFFSET", "0.8")
+    resolution = get_environment_value("COMPUTE_RIGHT_EDGE_PATH_RESOLUTION", "1.0")
+
+    # 参数替换配置 - 确保值为字符串类型
+    param_substitutions = {
+        "offset": str(off_set),
+        "resolution": str(resolution),
+    }    
+    
+    # 配置参数文件
+    configured_params = RewrittenYaml(
+        source_file=params_file_path,
+        param_rewrites=param_substitutions,
+        convert_types=True
+    )    
+    
     # compute_right_edge_path Node
     compute_right_edge_path_server_node = Node(
         executable='compute_right_edge_path_server_node',
@@ -24,7 +63,7 @@ def generate_launch_description():
         name='compute_right_edge_path_action_server',
         namespace='',
         output='screen',
-        parameters=[params_file_path],
+        parameters=[configured_params],
         arguments=['--ros-args', '--log-level', ['compute_right_edge_path_action_server:=', LaunchConfiguration('log_level')]]
     )
    

@@ -39,11 +39,12 @@ namespace garage_utils_pkg
         {
                 this->declare_parameter<std::string>("path_topic_name", "garage_path");
                 this->declare_parameter<double>("dis_thr", 2.5);
-                this->declare_parameter<double>("resolution", 2.0);
                 this->declare_parameter<bool>("test", false);
                 this->declare_parameter<double>("robot_x_test", 0.0);
                 this->declare_parameter<double>("robot_y_test", 3.5);
-                this->declare_parameter<bool>("strict_mode", true);
+                this->declare_parameter<bool>("strict_mode", true);                
+                this->declare_parameter<double>("offset", 0.8);
+                this->declare_parameter<double>("resolution", 1.0);
 
                 this->dis_thr_ = this->get_parameter_or("dis_thr", 2.5);
                 this->path_topic_name_ = this->get_parameter_or("path_topic_name", std::string("garage_path"));
@@ -51,6 +52,8 @@ namespace garage_utils_pkg
                 this->robot_x_test = this->get_parameter_or("robot_x_test", 0.0);
                 this->robot_y_test = this->get_parameter_or("robot_y_test", 3.5);
                 this->strict_mode = this->get_parameter_or("strict_mode", true);
+                this->offset_ = this->get_parameter_or("offset", 0.8);
+                this->resolution_ = this->get_parameter_or("resolution", 1.0);
 
                 RCLCPP_INFO(get_logger(), "------------ list params ------------ ");
                 RCLCPP_INFO(get_logger(), "dist_thr: %f", this->dis_thr_);
@@ -59,6 +62,8 @@ namespace garage_utils_pkg
                 RCLCPP_INFO(get_logger(), "robot_y_test: %f", robot_y_test);
                 RCLCPP_INFO(get_logger(), "test: %s", test?"true":"false");
                 RCLCPP_INFO(get_logger(), "strict_mode: %s", strict_mode?"true":"false");
+                RCLCPP_INFO(get_logger(), "offset: %f", this->offset_);
+                RCLCPP_INFO(get_logger(), "resolution: %f", this->resolution_);
         }
 
         void ComputeRightEdgePathActionServer::print_polygons(const std::vector<geometry_msgs::msg::Polygon> polygons)
