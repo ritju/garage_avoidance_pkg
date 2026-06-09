@@ -5,9 +5,3 @@ robot_avoidance_node:
     safe_width_threshold: 0.01
     start_end_path_threshold: 2.0
     car_size_threshold: 1.0
-
-welt_model_node:
-  ros__parameters:
-    footprint_w: 0.2
-    footprint_h_back: 0.2
-    footprint_h_front: 0.2

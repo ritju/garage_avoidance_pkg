@@ -10,6 +10,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 find_free_space_pkg = get_package_share_directory("find_free_space")
 robot_avoidance_pkg = get_package_share_directory("robot_avoidance")
+welt_pkg = get_package_share_directory("welt_model")
 find_free_space_param_file_path = os.path.join(find_free_space_pkg, "params", "config.yaml")
 print('find_free_space_param_file_path:', find_free_space_param_file_path)
 
@@ -25,6 +26,10 @@ welt = ExecuteProcess(
     cmd=['ros2', 'run', 'welt_model', 'welt_model'],
     output='screen'
 )
+
+welt_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(welt_pkg, 'launch', 'welt.launch.py'))
+    )
 
 find_free_space = Node(
                         package='find_free_space',
@@ -77,7 +82,8 @@ def generate_launch_description():
         compute_right_edge_path,
         # find_free_space,
         find_free_space_launch,
-        welt,
+        # welt,
+        welt_launch,
         pub_rect_markers,
         # delay_garage_nav,
         garage_navigation,
