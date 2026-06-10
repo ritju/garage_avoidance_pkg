@@ -412,10 +412,11 @@ namespace garage_utils_pkg
                         this->path_ = path_generator_->get_path();
 
                         // 给path添加时间戳
-                        this->path_.header.stamp = this->get_clock()->now();
+                        auto stamp = this->get_clock()->now();
+                        this->path_.header.stamp = stamp;
                         for (size_t i = 0; i < this->path_.poses.size(); i++)
                         {
-                                this->path_.poses[i].header.stamp = this->get_clock()->now();
+                                this->path_.poses[i].header.stamp = stamp;
                         }
 
                         // 4、publish path
