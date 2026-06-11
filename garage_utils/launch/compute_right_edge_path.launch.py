@@ -42,11 +42,13 @@ def generate_launch_description():
     # 获取环境变量值
     off_set = get_environment_value("COMPUTE_RIGHT_EDGE_PATH_OFFSET", "0.8")
     resolution = get_environment_value("COMPUTE_RIGHT_EDGE_PATH_RESOLUTION", "1.0")
+    allow_inverse = get_environment_value("COMPUTE_RIGHT_EDGE_PATH_ALLOW_INVERSE", "False")
 
     # 参数替换配置 - 确保值为字符串类型
     param_substitutions = {
         "offset": str(off_set),
         "resolution": str(resolution),
+        "allow_inverse": str(allow_inverse).lower(),
     }    
     
     # 配置参数文件

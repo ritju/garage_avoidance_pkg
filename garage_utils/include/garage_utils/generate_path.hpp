@@ -19,12 +19,12 @@ namespace garage_utils_pkg
                 explicit GeneratePath(rclcpp::Node::SharedPtr node);
                 ~GeneratePath();
 
-                void process_(const std::vector<EnhancedPoint>& points, const std::vector<geometry_msgs::msg::Polygon>& polygons);
+                void process_(const std::vector<EnhancedPoint>& points, const std::vector<geometry_msgs::msg::Polygon>& polygons, bool path_inverse);
                 int find_polygon_index(const EnhancedPoint& pt1, const EnhancedPoint& pt2, const std::vector<geometry_msgs::msg::Polygon>& polygons);
                 std::pair<Point, Point> find_edge(const EnhancedPoint& pt1, const EnhancedPoint& pt2, const EnhancedRect& rect);
                 nav_msgs::msg::Path generate_path_for_one_segment(const EnhancedPoint& pt1, const EnhancedPoint& pt2, const geometry_msgs::msg::Polygon& polygons);
                 std::pair<Point, Point> generate_path_for_one_segment2(const EnhancedPoint& pt1, const EnhancedPoint& pt2, const geometry_msgs::msg::Polygon& polygons);
-                void add_orientation_for_path(nav_msgs::msg::Path &path);
+                void add_orientation_for_path(nav_msgs::msg::Path &path, bool path_inverse);
                 void filter_for_path(nav_msgs::msg::Path &path);
                 void filter_for_path2(nav_msgs::msg::Path &path);
 

@@ -41,6 +41,10 @@ public:
   size_t get_current_polygon_index(double x, double y, std::vector<geometry_msgs::msg::Polygon> polygons);
   std::vector<Point> generate_first_polygon(double robot_x, double robot_y, double car_x, double car_y, std::vector<geometry_msgs::msg::Polygon> &polygons);
   bool get_map_robot_tf();
+  bool allow_inverse_{false};  // 允许生成相反方向的路径，主要用于机器人无法调头的情况。
+  bool robot_need_turn_{false}; // 汽车在机器人行进方向上，机器人是否需要调头
+  bool calculate_robot_need_turn(double robot_x, double robot_y, double robot_theta, double car_x, double car_y);
+  bool path_inverse_{false};  //最终生成path时，是否需要将path反向，主要用于机器人无法调头的情况。其值由inverse_和robot_need_turn_共同决定。
   
     // 检查goal的合法性
     bool goal_checker(std::shared_ptr<const ComputeRightEdgePath::Goal> goal, std::string& reason);

@@ -14,7 +14,7 @@ namespace garage_utils_pkg
              RCLCPP_INFO(node_->get_logger(), " [generate_path] GeneratePath destructor.");   
         }
 
-        void GeneratePath::process_(const std::vector<EnhancedPoint>& points, const std::vector<geometry_msgs::msg::Polygon>& polygons)
+        void GeneratePath::process_(const std::vector<EnhancedPoint>& points, const std::vector<geometry_msgs::msg::Polygon>& polygons, bool path_inverse)
         {
               RCLCPP_INFO(node_->get_logger(), " [generate_path] Begin to generating path..."); 
               this->path_.header.frame_id = "map";
@@ -92,7 +92,7 @@ namespace garage_utils_pkg
                filter_for_path(this->path_);
                size_t size_after_filter = this->path_.poses.size();
                RCLCPP_INFO(node_->get_logger(), "delete %ld pose(s).", size_before_filter - size_after_filter);
-               add_orientation_for_path(this->path_);
+               add_orientation_for_path(this->path_, path_inverse);
                
         //        for (size_t i = 0; i < path_all.size(); i++)
         //        {
@@ -127,8 +127,17 @@ namespace garage_utils_pkg
                 path.poses.resize(index+1);  // 截断尾部冗余元素
         }
         
-        void GeneratePath::add_orientation_for_path(nav_msgs::msg::Path &path)
+        void GeneratePath::add_orientation_for_path(nav_msgs::msg::Path &path, bool path_inverse)
         {
+                if (path.poses.size() < 2)
+                {
+                        RCLCPP_WARN(node_->get_logger(), " [generate_path] path size less than 2, cannot add orientation.");
+                        return;
+                }
+                if (path_inverse)
+                {
+                        std::reverse(path.poses.begin(), path.poses.end());
+                }
                 for (size_t i = 0; i < path.poses.size() - 1; i++)
                 {
                         auto &point_start = path.poses[i].pose;
@@ -139,6 +148,10 @@ namespace garage_utils_pkg
                         tf2::convert(quat, point_start.orientation);                        
                 }
                 path.poses[path.poses.size() - 1].pose.orientation = path.poses[path.poses.size() - 2].pose.orientation;
+                if (path_inverse)
+                {
+                        std::reverse(path.poses.begin(), path.poses.end());
+                }
         }   
 
         void GeneratePath::optimize_neighbored_path(std::vector<std::pair<Point, Point>>& path_all)

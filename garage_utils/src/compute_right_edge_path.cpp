@@ -45,6 +45,7 @@ namespace garage_utils_pkg
                 this->declare_parameter<bool>("strict_mode", true);                
                 this->declare_parameter<double>("offset", 0.8);
                 this->declare_parameter<double>("resolution", 1.0);
+                this->declare_parameter<bool>("allow_inverse", false);
 
                 this->dis_thr_ = this->get_parameter_or("dis_thr", 2.5);
                 this->path_topic_name_ = this->get_parameter_or("path_topic_name", std::string("garage_path"));
@@ -54,6 +55,7 @@ namespace garage_utils_pkg
                 this->strict_mode = this->get_parameter_or("strict_mode", true);
                 this->offset_ = this->get_parameter_or("offset", 0.8);
                 this->resolution_ = this->get_parameter_or("resolution", 1.0);
+                this->allow_inverse_ = this->get_parameter_or("allow_inverse", false);
 
                 RCLCPP_INFO(get_logger(), "------------ list params ------------ ");
                 RCLCPP_INFO(get_logger(), "dist_thr: %f", this->dis_thr_);
@@ -64,6 +66,8 @@ namespace garage_utils_pkg
                 RCLCPP_INFO(get_logger(), "strict_mode: %s", strict_mode?"true":"false");
                 RCLCPP_INFO(get_logger(), "offset: %f", this->offset_);
                 RCLCPP_INFO(get_logger(), "resolution: %f", this->resolution_);
+                RCLCPP_INFO(get_logger(), "allow_inverse: %s", allow_inverse_?"true":"false");
+                RCLCPP_INFO(get_logger(), "------------------------------------- ");
         }
 
         void ComputeRightEdgePathActionServer::print_polygons(const std::vector<geometry_msgs::msg::Polygon> polygons)
@@ -171,11 +175,22 @@ namespace garage_utils_pkg
                                 std::this_thread::sleep_for(std::chrono::duration<double>(0.2));
                         }
 
-                        double robot_x, robot_y, car_x, car_y;
+                        double robot_x, robot_y, robot_theta, car_x, car_y;
                         robot_x = map_robot_tf.getOrigin().getX();
                         robot_y = map_robot_tf.getOrigin().getY();
+                        robot_theta = tf2::getYaw(map_robot_tf.getRotation());
                         car_x = goal->car_pose.pose.position.x;
                         car_y = goal->car_pose.pose.position.y;
+                        this->robot_need_turn_ = calculate_robot_need_turn(robot_x, robot_y, robot_theta, car_x, car_y);
+                        RCLCPP_INFO(get_logger(), "robot need to turn around: %s, allow inverse: %s",
+                                this->robot_need_turn_ ? "true" : "false", this->allow_inverse_ ? "true" : "false");
+
+                        if (this->allow_inverse_ && this->robot_need_turn_)
+                        { 
+                                this->path_inverse_ = true;
+                                RCLCPP_INFO(get_logger(), "allow inverse path, will generate path in inverse direction");
+                        }
+
 
                         // test
                         if (this->test)
@@ -408,7 +423,7 @@ namespace garage_utils_pkg
                                 } 
                         }     
                         
-                        path_generator_->process_(points_ordered, this->polygons_);
+                        path_generator_->process_(points_ordered, this->polygons_, this->path_inverse_);
                         this->path_ = path_generator_->get_path();
 
                         // 给path添加时间戳
@@ -515,6 +530,28 @@ namespace garage_utils_pkg
                         return (distance(px, py, x1, y1) + distance(px, py, x2, y2)) / 2.0;
                 }
         }
+
+        bool ComputeRightEdgePathActionServer::calculate_robot_need_turn(double robot_x, double robot_y, double robot_theta,
+                               double car_x, double car_y) 
+        {   
+                double PI = 3.14159265358979323846;
+                // 1. 计算从汽车指向机器人的方向角
+                double dx = robot_x - car_x;   // 注意这里是 robot - car
+                double dy = robot_y - car_y;
+                double direction_from_car_to_robot = std::atan2(dy, dx);   // 范围 [-π, π]
+
+                // 2. 计算与机器人当前朝向的角度差
+                double diff = direction_from_car_to_robot - robot_theta;
+
+                // 3. 归一化到 [-π, π]
+                diff = std::fmod(diff, 2 * PI);
+                if (diff > PI) diff -= 2 * PI;
+                if (diff < -PI) diff += 2 * PI;
+
+                // 4. 取绝对值，若小于 π/2 则不需要调头，否则需要调头
+                diff = std::fabs(diff);
+                return diff >= PI / 2;
+                }
 
         bool ComputeRightEdgePathActionServer::get_map_robot_tf()
         {

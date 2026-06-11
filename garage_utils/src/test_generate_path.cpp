@@ -122,7 +122,7 @@ int main(int argc, char**argv)
                }
 
                auto path_generator = new garage_utils_pkg::GeneratePath(node);
-               path_generator->process_(points_ordered, polygons);
+               path_generator->process_(points_ordered, polygons, false);
                auto path = path_generator->get_path();
                auto path_pub = node->create_publisher<nav_msgs::msg::Path>("garage_path", rclcpp::QoS(1).reliable());
                
