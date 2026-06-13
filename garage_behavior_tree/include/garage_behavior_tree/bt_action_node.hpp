@@ -18,6 +18,7 @@
 #include <memory>
 #include <string>
 #include <chrono>
+#include <atomic>
 
 #include "behaviortree_cpp_v3/action_node.h"
 #include "nav2_util/node_utils.hpp"
@@ -49,12 +50,7 @@ public:
     const BT::NodeConfiguration & conf)
   : BT::ActionNodeBase(xml_tag_name, conf), action_name_(action_name)
   {
-    // auto node_dump = std::make_shared<rclcpp::Node>("node_dump");
-    // RCLCPP_INFO(node_dump->get_logger(), "-----------------");
-    // RCLCPP_INFO(node_dump->get_logger(), "before get node key");
     node_ = config().blackboard->template get<rclcpp::Node::SharedPtr>("node");
-    // RCLCPP_INFO(node_dump->get_logger(), "after get node key");
-    // RCLCPP_INFO(node_->get_logger(), "node name: %s", node_->get_name());
     RCLCPP_INFO(node_->get_logger(), "action name: %s", action_name_.c_str());
 
     callback_group_ = node_->create_callback_group(
@@ -79,7 +75,6 @@ public:
     }
     createActionClient(action_name_);
 
-    // Give the derive class a chance to do any initialization
     RCLCPP_DEBUG(node_->get_logger(), "\"%s\" BtActionNode initialized", xml_tag_name.c_str());
   }
 
@@ -192,8 +187,17 @@ public:
    */
   BT::NodeStatus tick() override
   {
+    // 在开始时检查取消标志
+    if (cancel_requested_.load()) {
+      RCLCPP_INFO(node_->get_logger(), "tick() detected cancel_requested for %s", action_name_.c_str());
+      cancel_requested_.store(false);
+      return BT::NodeStatus::FAILURE;
+    }
+    
     // first step to be done only at the beginning of the Action
     if (status() == BT::NodeStatus::IDLE) {
+      // 重置取消标志
+      cancel_requested_.store(false);
       // setting the status to RUNNING to notify the BT Loggers (if any)
       setStatus(BT::NodeStatus::RUNNING);
 
@@ -225,6 +229,15 @@ public:
 
       // The following code corresponds to the "RUNNING" loop
       if (rclcpp::ok() && !goal_result_available_) {
+        // 在处理循环中检查取消标志
+        if (cancel_requested_.load()) {
+          RCLCPP_INFO(node_->get_logger(), "Cancellation detected during execution for %s", action_name_.c_str());
+          goal_result_available_ = true;
+          result_.code = rclcpp_action::ResultCode::CANCELED;
+          cancel_requested_.store(false);
+          return BT::NodeStatus::FAILURE;
+        }
+        
         // user defined callback. May modify the value of "goal_updated_"
         on_wait_for_result(feedback_);
 
@@ -271,6 +284,14 @@ public:
       }
     }
 
+    // 检查是否因为取消而结束
+    if (result_.code == rclcpp_action::ResultCode::CANCELED) {
+      RCLCPP_INFO(node_->get_logger(), "Action %s was cancelled", action_name_.c_str());
+      cancel_requested_.store(false);
+      goal_handle_.reset();
+      return on_cancelled();
+    }
+    
     BT::NodeStatus status;
     switch (result_.code) {
       case rclcpp_action::ResultCode::SUCCEEDED:
@@ -299,18 +320,33 @@ public:
    */
   void halt() override
   {
+    RCLCPP_WARN(node_->get_logger(), "BtActionNode::halt() called for %s - forcing immediate cancellation", 
+                action_name_.c_str());
+    
+    // 1. 设置取消标志
+    cancel_requested_.store(true);
+    
+    // 2. 尝试发送取消请求给action server（不等待结果）
     if (should_cancel_goal()) {
+      RCLCPP_INFO(node_->get_logger(), "Sending cancel request to %s", action_name_.c_str());
       auto future_cancel = action_client_->async_cancel_goal(goal_handle_);
-      if (callback_group_executor_.spin_until_future_complete(future_cancel, server_timeout_) !=
-        rclcpp::FutureReturnCode::SUCCESS)
-      {
-        RCLCPP_ERROR(
-          node_->get_logger(),
-          "Failed to cancel action server for %s", action_name_.c_str());
-      }
+      // 不等待，让取消请求在后台处理
+      // 如果需要确保发送成功，可以短暂等待，但不要阻塞
+      // callback_group_executor_.spin_until_future_complete(future_cancel, std::chrono::milliseconds(50));
     }
-
+    
+    // 3. 关键：强制设置结果可用，让tick立即退出
+    goal_result_available_ = true;
+    result_.code = rclcpp_action::ResultCode::CANCELED;
+    
+    // 4. 重置goal_handle相关状态
+    goal_handle_.reset();
+    future_goal_handle_.reset();
+    
+    // 5. 立即重置节点状态
     setStatus(BT::NodeStatus::IDLE);
+    
+    RCLCPP_INFO(node_->get_logger(), "BtActionNode::halt() completed for %s", action_name_.c_str());
   }
 
 protected:
@@ -392,22 +428,37 @@ protected:
     }
 
     auto timeout = remaining > bt_loop_duration_ ? bt_loop_duration_ : remaining;
-    auto result =
-      callback_group_executor_.spin_until_future_complete(*future_goal_handle_, timeout);
-    elapsed += timeout;
-
-    if (result == rclcpp::FutureReturnCode::INTERRUPTED) {
-      future_goal_handle_.reset();
-      throw std::runtime_error("send_goal failed");
-    }
-
-    if (result == rclcpp::FutureReturnCode::SUCCESS) {
-      goal_handle_ = future_goal_handle_->get();
-      future_goal_handle_.reset();
-      if (!goal_handle_) {
-        throw std::runtime_error("Goal was rejected by the action server");
+    
+    // 使用更短的超时时间，便于响应取消
+    auto check_interval = std::chrono::milliseconds(50);
+    auto total_waited = std::chrono::milliseconds(0);
+    
+    while (total_waited < timeout) {
+      // 检查取消标志
+      if (cancel_requested_.load()) {
+        RCLCPP_INFO(node_->get_logger(), "Cancellation detected while waiting for goal handle");
+        future_goal_handle_.reset();
+        return false;
       }
-      return true;
+      
+      auto wait_time = std::min(check_interval, timeout - total_waited);
+      auto result = callback_group_executor_.spin_until_future_complete(*future_goal_handle_, wait_time);
+      total_waited += wait_time;
+      elapsed += wait_time;
+      
+      if (result == rclcpp::FutureReturnCode::SUCCESS) {
+        goal_handle_ = future_goal_handle_->get();
+        future_goal_handle_.reset();
+        if (!goal_handle_) {
+          throw std::runtime_error("Goal was rejected by the action server");
+        }
+        return true;
+      }
+      
+      if (result == rclcpp::FutureReturnCode::INTERRUPTED) {
+        future_goal_handle_.reset();
+        throw std::runtime_error("send_goal failed");
+      }
     }
 
     return false;
@@ -453,6 +504,9 @@ protected:
   std::shared_ptr<std::shared_future<typename rclcpp_action::ClientGoalHandle<ActionT>::SharedPtr>>
   future_goal_handle_;
   rclcpp::Time time_goal_sent_;
+  
+  // 取消请求标志
+  std::atomic<bool> cancel_requested_{false};
 };
 
 }  // namespace garage_utils_pkg
