@@ -65,6 +65,9 @@ list(APPEND plugin_libs welt_model_node)
 add_library(is_car_moving SHARED src/is_car_moving.cpp)
 list(APPEND plugin_libs is_car_moving)
 
+add_library(is_avoid_direction_has_car SHARED src/is_avoid_direction_has_car.cpp)
+list(APPEND plugin_libs is_avoid_direction_has_car)
+
 foreach(bt_plugin ${plugin_libs})
   ament_target_dependencies(${bt_plugin} ${dependencies})
   target_compile_definitions(${bt_plugin} PRIVATE BT_PLUGIN_EXPORT)
