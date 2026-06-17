@@ -66,6 +66,7 @@ def generate_launch_description():
         namespace='',
         output='screen',
         parameters=[configured_params],
+        respawn=True,
         arguments=['--ros-args', '--log-level', ['compute_right_edge_path_action_server:=', LaunchConfiguration('log_level')]]
     )
    
