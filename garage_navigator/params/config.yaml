@@ -8,6 +8,7 @@ bt_garage_navigator:
       - compute_right_edge_path_action
       - find_car_avoidance_point_action
       - welt_model_node
+      - is_avoid_direction_has_car
       - nav2_compute_path_to_pose_action_bt_node
       - nav2_compute_path_through_poses_action_bt_node
       - nav2_smooth_path_action_bt_node

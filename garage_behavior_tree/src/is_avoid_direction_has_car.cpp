@@ -20,6 +20,13 @@ avoid_side_has_car_(true)
     speed_threshold_ = node_->declare_parameter("avoid_speed_threshold", 0.3);
     side_angle_threshold_ = node_->declare_parameter("avoid_side_angle", 90.0 * M_PI / 180.0);
 
+    callback_group_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive, false);
+
+    callback_group_executor_.add_callback_group(callback_group_, node_->get_node_base_interface());
+
+    rclcpp::SubscriptionOptions sub_option;
+    sub_option.callback_group = callback_group_;
+
     car_sub_ = node_->create_subscription<capella_ros_msg::msg::CarDetectArray>
     (
         "/car_information_all",
@@ -27,7 +34,8 @@ avoid_side_has_car_(true)
         std::bind(
             &IsAvoidDirectionHasCar::carInformationCallback,
             this,
-            std::placeholders::_1)
+            std::placeholders::_1),
+        sub_option
     );
 
     odom_sub_ = node_->create_subscription<nav_msgs::msg::Odometry>
@@ -37,7 +45,8 @@ avoid_side_has_car_(true)
         std::bind(
             &IsAvoidDirectionHasCar::odomCallback,
             this,
-            std::placeholders::_1)
+            std::placeholders::_1),
+        sub_option
     );
 
     last_car_time_ = node_->now();
@@ -67,7 +76,7 @@ void IsAvoidDirectionHasCar::carInformationCallback(
 
     if(!nav2_util::getCurrentPose(robot_pose_, *tf_buffer_, "map", "base_link", 0.1))
     {
-        RCLCPP_WARN(node_->get_logger(), "get robot pose failed");
+        RCLCPP_WARN(node_->get_logger(), "[IsAvoidDirectionHasCar] get robot pose failed");
         return;
     }
 
@@ -76,6 +85,7 @@ void IsAvoidDirectionHasCar::carInformationCallback(
 
     double min_dist = std::numeric_limits<double>::max();
     bool found = false;
+    double nearest_pose_angle = 0.0;
     geometry_msgs::msg::PoseStamped nearest_pose;
 
     for(auto &car : msg->results)
@@ -122,6 +132,7 @@ void IsAvoidDirectionHasCar::carInformationCallback(
             min_dist = dist;
             nearest_pose = car.pose;
             found = true;
+            nearest_pose_angle = angle;
         }
     }
 
@@ -132,7 +143,7 @@ void IsAvoidDirectionHasCar::carInformationCallback(
         last_car_time_ = node_->now();
         speed_sum_   = 0.0;
         speed_count_ = 0;
-        RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 2000, "avoid side car detected (nearest, same direction)");
+        RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 2000, "[IsAvoidDirectionHasCar] avoid side car detected (nearest, same direction, angle:%.1f rad)", nearest_pose_angle);
     }
     else
     {
@@ -142,18 +153,19 @@ void IsAvoidDirectionHasCar::carInformationCallback(
         double dt = (node_->now() - last_car_time_).seconds();
         if(dt > timeout) {
             avoid_side_has_car_=false;
-            RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 2000, "avoid side clear (no same-direction car for %.1f s)", dt);
+            RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 2000, "[IsAvoidDirectionHasCar] avoid side clear (no same-direction car for %.1f s，speed: %.1f)", dt, avg_speed);
         }
     }
 }
 
 BT::NodeStatus IsAvoidDirectionHasCar::tick()
 {
+    callback_group_executor_.spin_some();
     geometry_msgs::msg::PoseStamped pose;
 
     if(!getInput("car_pose", pose))
     {
-        RCLCPP_WARN(node_->get_logger(), "car_pose missing");
+        RCLCPP_WARN(node_->get_logger(), "[IsAvoidDirectionHasCar] car_pose missing");
         return BT::NodeStatus::SUCCESS;
     }
 
@@ -197,8 +209,11 @@ BT::NodeStatus IsAvoidDirectionHasCar::tick()
 
     if (avoid_side_has_car_)
     {
+        RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 2000, "[IsAvoidDirectionHasCar] has car");
         return BT::NodeStatus::SUCCESS;
     }
+
+    RCLCPP_INFO(node_->get_logger(), "[IsAvoidDirectionHasCar] not has car");
 
     // 无车：重置 car_pose_ 为"未设置"，等下次 tick 重新赋值后再循环
     car_pose_valid_  = false;

@@ -53,6 +53,9 @@ private:
 
     rclcpp::Node::SharedPtr node_;
 
+    rclcpp::CallbackGroup::SharedPtr callback_group_;
+    rclcpp::executors::SingleThreadedExecutor callback_group_executor_;
+
     // subscriber
     rclcpp::Subscription<
         capella_ros_msg::msg::CarDetectArray
