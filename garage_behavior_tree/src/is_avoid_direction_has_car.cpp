@@ -10,8 +10,8 @@ IsAvoidDirectionHasCar::IsAvoidDirectionHasCar(
     const BT::NodeConfiguration & conf)
 :
 BT::ConditionNode(name, conf),
-avoid_side_has_car_(true),
-car_pose_valid_(false)
+car_pose_valid_(false),
+avoid_side_has_car_(true)
 {
     node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
     tf_buffer_ = config().blackboard->get<tf2_ros::Buffer::SharedPtr>("tf_buffer");
