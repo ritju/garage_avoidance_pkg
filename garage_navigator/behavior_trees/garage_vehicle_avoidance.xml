@@ -1,89 +1,135 @@
 <root main_tree_to_execute="MainTree">
-  <BehaviorTree ID="MainTree">  
-    
-    <Fallback>
-      <PipelineSequence>
-        <RateController hz="1">
-          <Inverter>
-            <FindCarAvoidancePoint polygons="{polygons}" car_pose="{car_pose}" car_size="{car_size}" free_point="{free_point}" goal="{goal}" state="{state}" />
-          </Inverter>
-        </RateController>
-        <SingleTrigger>
-          <ComputeRightEdgePath polygons="{polygons}" car_pose="{car_pose}" garage_path="{garage_path}" goals="{goals}" state="{state}" />
-        </SingleTrigger>
-        <SubTree ID="NavigateThroughPoses" __shared_blackboard="true" />
-      </PipelineSequence>
-
+  <BehaviorTree ID="MainTree">
+    <WhileDoElse>
+      <!-- 子节点1：条件 - 未超时 -->
       <Sequence>
-        <!-- <SubTree ID="NavigatoToPose" __shared_blackboard="true" /> -->
-        <WeltModelNode goal_pose="{free_point}" state="{state}" />
-        <Wait wait_duration="15" />
-      </Sequence>      
+        <!-- <Inverter>
+          <DistanceTraveled distance="4.0" />
+        </Inverter> -->
+        <IsAvoidDirectionHasCar car_pose="{car_pose}" />
+      </Sequence>
       
-    </Fallback>
+      <!-- 子节点2：条件为真时执行（未超时，执行避车） -->
+      <Fallback>
+        <PipelineSequence>
+          <RateController hz="1">
+            <Inverter>
+              <FindCarAvoidancePoint polygons="{polygons}" car_pose="{car_pose}" car_size="{car_size}" free_point="{free_point}" goal="{goal}" state="{state}" />
+            </Inverter>
+          </RateController>
+          <SingleTrigger>
+            <ComputeRightEdgePath polygons="{polygons}" car_pose="{car_pose}" garage_path="{garage_path}" goals="{goals}" state="{state}" />
+          </SingleTrigger>
+          <SubTree ID="NavigateThroughPoses" __shared_blackboard="true" />
+        </PipelineSequence>
+        <Sequence>
+          <WeltModelNode goal_pose="{free_point}" state="{state}" />
+          <Wait wait_duration="15" />
+        </Sequence>      
+      </Fallback>
+      
+      <!-- 子节点3：条件为假时执行（超时，结束避车） -->
+      <Wait wait_duration="1" />
+    </WhileDoElse>
   </BehaviorTree>
 
   <BehaviorTree ID="NavigateThroughPoses">
-    <RecoveryNode number_of_retries="12" name="NavigateRecovery">
+    <RecoveryNode number_of_retries="6" name="NavigateRecovery">
       <PipelineSequence name="NavigateWithReplanning">
+        <RateController hz="2.0">
+          <RemovePassedGoals
+              input_goals="{goals}"
+              output_gpp_goals="{gpp_goals}"
+              radius="5.0"
+              accumulate_distance="8.0"
+              max_gpp_segment_m="300.0"
+              replan_trigger_arc_m="100.0"
+              teb_message_timeout_s="2.0"
+              pass_check_max_search_dist_m="8.0"
+              pass_behind_tol_m="0.0"
+              pass_enable_yaw_check="false"
+              pass_yaw_threshold_rad="2.6"
+              pass_tail_relax_remaining_path_max_m="2.0"
+              pass_tail_relax_radius_m="1.0"
+              global_frame="map"
+              robot_base_frame="base_link"
+              teb_topic="teb_global_plan"
+              odom_topic="odom"
+              pass_check_min_odom_linear_x_mps="0.15"
+              gpp_goal_pose_match_xy_m="0.1"
+              gpp_goal_pose_match_yaw_rad="-1.0"
+              enable_backward_mode="true"
+            />
+        </RateController>
         <RateController hz="1.0">
-          <IsPedestrianFront pedestrain_distance = "2.0"/>
+          <IsCollision expand_contour="false" server_timeout="1000"/>
         </RateController>
-        <RateController hz="5.0">
-          <IsCollision/>
+        <RateController hz="0.5">
+          <PathCheck check_distance="1000.0" input_goals="{goals}" output_goals="{goals}"/>
         </RateController>
-        <RateController hz="10.0">
-          <RemovePassedGoals input_goals="{goals}" output_goals="{goals}" radius="1.0"/>
-        </RateController>
-        <SingleTrigger>
-          <RecoveryNode number_of_retries="2" name="ComputePathThroughPoses">
+        <RecoveryNode number_of_retries="1" name="ComputePathToPose">
+            <Fallback>
+              <ReactiveSequence>
+                <Inverter>
+                  <PathExpiringTimer seconds="10000" path="{path}"/>
+                </Inverter>
+                <Inverter>
+                  <GlobalUpdatedGoal  goals="{gpp_goals}"/>
+                </Inverter>
+              </ReactiveSequence>
+              <Sequence>
+                 <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="6.0"/>
+                 <ComputePathThroughPoses goals="{gpp_goals}" path="{path}" planner_id="GridBased"/>
+              </Sequence>
+            </Fallback>
             <Sequence>
-              <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="2.0"/>
-              <Wait wait_duration="0.5"/>
-              <IsPathValid goals="{goals}" check_distance="10000.0"/>
-              <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="GridBased"/>
-            </Sequence>
-            <Sequence>
-              <Wait wait_duration="0.5"/>
-              <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="2.0"/>
-              <Wait wait_duration="0.5"/>
               <Fallback>
-                <IsPathValid goals="{goals}" check_distance="10000.0"/>
-                <PathCheck check_distance="10000.0"/>
+                <IsCollision expand_contour="true" server_timeout="1000"/>
+                <Sequence>
+                  <Wait wait_duration="5.0"/>
+                  <CollisionRecover/>
+                </Sequence>
               </Fallback>
-              <Wait wait_duration="0.5"/>
+              <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="6.0"/>
             </Sequence>
-          </RecoveryNode>
-        </SingleTrigger>
-        <RecoveryNode number_of_retries="2" name="FollowPath">
-          <FollowPath path="{path}" controller_id="FollowPath"/>
+        </RecoveryNode>
+        <RecoveryNode number_of_retries="1" name="FollowPath">
+          <FollowPath path="{path}" controller_id="FollowPath" input_goals="{gpp_goals}"/>
           <Sequence>
-            <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="local_costmap/clear_except_local_costmap" reset_distance="2.0"/>
-            <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="2.0"/>
-            <Wait wait_duration="0.5"/>
-            <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="GridBased"/>
+              <Fallback>
+                <IsCollision expand_contour="true" server_timeout="1000"/>
+                <Sequence>
+                  <Wait wait_duration="5.0"/>
+                  <CollisionRecover/>
+                </Sequence>
+              </Fallback>
+              <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="local_costmap/clear_except_local_costmap" reset_distance="3.0"/>
+              <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="6.0"/>
+              <Wait wait_duration="2.0"/>
+              <ComputePathThroughPoses goals="{gpp_goals}" path="{path}" planner_id="GridBased"/>
           </Sequence>
         </RecoveryNode>
       </PipelineSequence>
       <ReactiveFallback name="RecoveryFallback">
         <GoalUpdated/>
         <Sequence name="RecoveryActions">
-          <Wait wait_duration="0.5"/>
-          <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="local_costmap/clear_except_local_costmap" reset_distance="2.0"/>
-          <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="2.0"/>
-          <Wait wait_duration="0.5"/>
+          <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="local_costmap/clear_except_local_costmap" reset_distance="3.0"/>
+          <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="6.0"/>
+          <Wait wait_duration="2.0"/>
           <Fallback>
-            <IsCollision/>
-            <CollisionRecover/>
+            <IsCollision expand_contour="true" server_timeout="1000"/>
+            <Sequence>
+              <Wait wait_duration="5.0"/>
+              <CollisionRecover/>
+            </Sequence>
           </Fallback>
-          <Wait wait_duration="0.5"/>
         </Sequence>
       </ReactiveFallback>
     </RecoveryNode>
   </BehaviorTree>
 
   <BehaviorTree ID="NavigatoToPose">
-    <RecoveryNode number_of_retries="6" name="NavigateRecovery">
+    <RecoveryNode number_of_retries="1000" name="NavigateRecovery">
       <PipelineSequence name="NavigateWithReplanning">
         <RecoveryNode number_of_retries="1" name="ComputePathToPose">
             <Fallback>
@@ -97,11 +143,13 @@
               </ReactiveSequence>
               <Sequence>
                  <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="2.0"/>
+                 <Wait wait_duration="1.0"/>
                  <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
               </Sequence>
             </Fallback>
             <Sequence>
               <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="2.0"/>
+              <Wait wait_duration="1.0"/>
             </Sequence>
           </RecoveryNode>
         <RateController hz="5.0">
@@ -111,6 +159,7 @@
           <FollowPath path="{path}" controller_id="FollowPath"/>
           <Sequence>
             <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="2.0"/>
+            <Wait wait_duration="1"/>
             <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
           </Sequence>
         </RecoveryNode>
@@ -120,6 +169,7 @@
         <Sequence name="RecoveryActions">
           <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="local_costmap/clear_except_local_costmap" reset_distance="2.0"/>
           <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="2.0"/>
+          <Wait wait_duration="1.0"/>
           <Fallback>
             <IsCollision/>
             <CollisionRecover/>
