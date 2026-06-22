@@ -10,7 +10,8 @@ IsAvoidDirectionHasCar::IsAvoidDirectionHasCar(
     const BT::NodeConfiguration & conf)
 :
 BT::ConditionNode(name, conf),
-avoid_side_has_car_(true)
+avoid_side_has_car_(true),
+car_pose_valid_(false)
 {
     node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
     tf_buffer_ = config().blackboard->get<tf2_ros::Buffer::SharedPtr>("tf_buffer");
@@ -160,7 +161,6 @@ void IsAvoidDirectionHasCar::carInformationCallback(
 
 BT::NodeStatus IsAvoidDirectionHasCar::tick()
 {
-    callback_group_executor_.spin_some();
     geometry_msgs::msg::PoseStamped pose;
 
     if(!getInput("car_pose", pose))
@@ -169,12 +169,10 @@ BT::NodeStatus IsAvoidDirectionHasCar::tick()
         return BT::NodeStatus::SUCCESS;
     }
 
-    std::lock_guard<std::mutex> lock(state_mutex_);
-
-    if (!car_pose_valid_ || (car_pose_valid_ && std::hypot(
+    if (std::hypot(
             pose.pose.position.x - original_car_pose_.pose.position.x,
             pose.pose.position.y - original_car_pose_.pose.position.y
-        ) > 1e-6))
+        ) > 1e-6)
     {
         // 获取机器人当前位姿，用于记录基准方向
         // geometry_msgs::msg::PoseStamped init_robot_pose;
@@ -198,6 +196,8 @@ BT::NodeStatus IsAvoidDirectionHasCar::tick()
         //     return BT::NodeStatus::SUCCESS;
         // }
 
+        RCLCPP_INFO(node_->get_logger(), "[IsAvoidDirectionHasCar] new car_pose");
+
         original_car_pose_ = pose;
         car_pose_ = pose;
         car_pose_valid_ = true;
@@ -207,13 +207,15 @@ BT::NodeStatus IsAvoidDirectionHasCar::tick()
         last_car_time_ = node_->now();   // 重置计时，从现在开始等待 callback 确认
     }
 
+    callback_group_executor_.spin_some();
+
     if (avoid_side_has_car_)
     {
-        RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 2000, "[IsAvoidDirectionHasCar] has car");
+        RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000, "[IsAvoidDirectionHasCar] has car");
         return BT::NodeStatus::SUCCESS;
     }
 
-    RCLCPP_INFO(node_->get_logger(), "[IsAvoidDirectionHasCar] not has car");
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000, "[IsAvoidDirectionHasCar] not has car");
 
     // 无车：重置 car_pose_ 为"未设置"，等下次 tick 重新赋值后再循环
     car_pose_valid_  = false;
