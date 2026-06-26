@@ -931,9 +931,13 @@ namespace garage_utils_pkg
                 edge_tmp.pt2.first = robot_pose_x_;
                 edge_tmp.pt2.second = robot_pose_y_;
                 
-                if (node_->has_parameter("stric_mode"))
+                if (node_->has_parameter("strict_mode"))
                 {
-                        this->strict_mode = true;
+                        this->strict_mode = node_->get_parameter("strict_mode").as_bool();
+                }
+                else
+                {
+                        this->strict_mode = false;
                 }
                 RCLCPP_INFO(node_->get_logger(), " [generate_model] strict mode: %s", this->strict_mode ? "true" : "false");
                 std::vector<int> vec_del;
@@ -941,7 +945,7 @@ namespace garage_utils_pkg
                 {
                     for (int v : adj.at(robot_edge_index))
                     {
-                        if (is_neighbor(edge_tmp, edges[v], dis_thr_) && strict_mode_check(edge_tmp, edges[v]))
+                        if (is_neighbor(edge_tmp, edges[v], dis_thr_) && !strict_mode_check(edge_tmp, edges[v]))
                         {
                                 RCLCPP_INFO(node_->get_logger(), " [generate_model] edge [(%f, %f,), (%f, %f)] delete.",
                                         edges[v].pt1.first, edges[v].pt1.second,
@@ -1097,7 +1101,7 @@ namespace garage_utils_pkg
                 RCLCPP_INFO(node_->get_logger(), " [generate_model]  dis1: %f", dis1);
                 RCLCPP_INFO(node_->get_logger(), " [generate_model]  dis2: %f", dis2);
 
-                if (dis_robot < dis_car && std::abs(dis_min - dis_robot) < 1e-3)
+                if (dis_robot < dis_car)
                 {
                         ret = false;
                 }                

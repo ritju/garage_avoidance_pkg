@@ -134,6 +134,7 @@ bool
 GarageVehicleAvoidanceNavigator::goalReceived(ActionT::Goal::ConstSharedPtr goal)
 {
   auto bt_xml_filename = goal->behavior_tree;
+  RCLCPP_INFO(logger_, "Loading BT from file: %s", bt_xml_filename.c_str());
 
   if (!bt_action_server_->loadBehaviorTree(bt_xml_filename)) {
     RCLCPP_ERROR(
