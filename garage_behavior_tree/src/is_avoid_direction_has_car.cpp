@@ -211,11 +211,25 @@ BT::NodeStatus IsAvoidDirectionHasCar::tick()
 
     if (avoid_side_has_car_)
     {
+        {//防止car_information_all话题无回调
+            double avg_speed = (speed_count_ > 0) ? (speed_sum_ / speed_count_) : 0.0;
+            double timeout = avg_speed > speed_threshold_ ? high_speed_timeout_ : low_speed_timeout_;
+            double dt = (node_->now() - last_car_time_).seconds();
+
+            if(dt > timeout) {
+                avoid_side_has_car_ = false;
+                car_pose_valid_  = false;
+                RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000, "[IsAvoidDirectionHasCar](tick) avoid side clear (no same-direction car for %.1f s，speed: %.1f)", dt, avg_speed);
+                RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000, "[IsAvoidDirectionHasCar](tick) no car");
+                return BT::NodeStatus::FAILURE;
+            }
+        }
+        
         RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000, "[IsAvoidDirectionHasCar] has car");
         return BT::NodeStatus::SUCCESS;
     }
 
-    RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000, "[IsAvoidDirectionHasCar] not has car");
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000, "[IsAvoidDirectionHasCar] no car");
 
     // 无车：重置 car_pose_ 为"未设置"，等下次 tick 重新赋值后再循环
     car_pose_valid_  = false;
