@@ -63,6 +63,13 @@ bt_garage_navigator:
       - nav2_is_collision_node
       - nav2_path_check_bt_node
 
+bt_garage_navigator_garage_vehicle_avoidance_rclcpp_node:
+  ros__parameters:
+    avoid_low_speed_timeout: 8.0
+    avoid_high_speed_timeout: 3.0
+    avoid_speed_threshold: 0.3
+    avoid_side_angle: 1.57
+
 lifecycle_manager:
   ros__parameters:
     autostart: true

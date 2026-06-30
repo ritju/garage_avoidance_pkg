@@ -16,10 +16,23 @@ avoid_side_has_car_(true)
     node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
     tf_buffer_ = config().blackboard->get<tf2_ros::Buffer::SharedPtr>("tf_buffer");
 
-    low_speed_timeout_ = node_->declare_parameter("avoid_low_speed_timeout", 8.0);
-    high_speed_timeout_ = node_->declare_parameter("avoid_high_speed_timeout", 3.0);
-    speed_threshold_ = node_->declare_parameter("avoid_speed_threshold", 0.3);
-    side_angle_threshold_ = node_->declare_parameter("avoid_side_angle", 90.0 * M_PI / 180.0);
+    auto declare_or_get = [this](const std::string& name, double default_val) -> double {
+        if (!node_->has_parameter(name)) {
+            return node_->declare_parameter(name, default_val);
+        } else {
+            return node_->get_parameter(name).as_double();
+        }
+    };
+
+    low_speed_timeout_ = declare_or_get("avoid_low_speed_timeout", 8.0);
+    high_speed_timeout_ = declare_or_get("avoid_high_speed_timeout", 3.0);
+    speed_threshold_ = declare_or_get("avoid_speed_threshold", 0.3);
+    side_angle_threshold_ = declare_or_get("avoid_side_angle", 90.0 * M_PI / 180.0);
+
+    RCLCPP_INFO(node_->get_logger(), 
+        "[IsAvoidDirectionHasCar] low_speed: %.1fs | high_speed: %.1fs | speed_threshold: %.2f m/s | side_angle: %.1f°",
+        low_speed_timeout_, high_speed_timeout_, speed_threshold_, 
+        side_angle_threshold_ * 180.0 / M_PI);
 
     callback_group_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive, false);
 
