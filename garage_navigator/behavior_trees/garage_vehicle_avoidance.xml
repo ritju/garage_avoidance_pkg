@@ -17,7 +17,7 @@
       <Sequence>
         <!-- <SubTree ID="NavigatoToPose" __shared_blackboard="true" /> -->
         <WeltModelNode goal_pose="{free_point}" state="{state}" />
-        <Wait wait_duration="15" />
+        <WaitForCarsGone idle_timeout="15" />
       </Sequence>      
       
     </Fallback>

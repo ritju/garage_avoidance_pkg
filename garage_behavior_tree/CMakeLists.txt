@@ -65,6 +65,10 @@ list(APPEND plugin_libs welt_model_node)
 add_library(is_car_moving SHARED src/is_car_moving.cpp)
 list(APPEND plugin_libs is_car_moving)
 
+# wait_for_cars_gone
+add_library(wait_for_cars_gone SHARED src/wait_for_cars_gone.cpp)
+list(APPEND plugin_libs wait_for_cars_gone)
+
 foreach(bt_plugin ${plugin_libs})
   ament_target_dependencies(${bt_plugin} ${dependencies})
   target_compile_definitions(${bt_plugin} PRIVATE BT_PLUGIN_EXPORT)
