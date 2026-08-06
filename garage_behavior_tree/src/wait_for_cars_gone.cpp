@@ -56,7 +56,7 @@ BT::NodeStatus WaitForCarsGone::tick()
     }
   }
 
-  // 最大等待总时长（可选，防止车流一直很大导致任务卡死）
+  // 最大等待总时长
   if (max_wait_ > 0.0 && (now - start_time_).seconds() >= max_wait_) {
     RCLCPP_WARN(node_->get_logger(),
       "避车等待超过最大时长 %.1f 秒，强制结束", max_wait_);

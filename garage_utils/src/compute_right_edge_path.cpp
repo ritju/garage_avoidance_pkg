@@ -187,7 +187,7 @@ namespace garage_utils_pkg
 
                         if (this->allow_inverse_ && this->robot_need_turn_)
                         { 
-                                this->path_inverse_ = true;
+                                this->path_inverse_ = true;    // 有一个控制是否掉头的变量
                                 RCLCPP_INFO(get_logger(), "allow inverse path, will generate path in inverse direction");
                         }
 
@@ -298,7 +298,7 @@ namespace garage_utils_pkg
 
                         geometry_msgs::msg::Polygon polygon_first;
                         Point p1_selected, p2_selected, p3_selected, p4_selected;
-                        auto p_v = generate_first_polygon(robot_x, robot_y, car_x, car_y, this->polygons_);
+                        auto p_v = generate_first_polygon(robot_x, robot_y, car_x, car_y, this->polygons_);    //裁剪通道
 
                         // bug fix p1==p3 || p2==p4
                         if (p_v[0] == p_v[2] || p_v[1] == p_v[3])
@@ -318,7 +318,7 @@ namespace garage_utils_pkg
                         p4_selected = p_v[3];
                         
                         
-                        // 更新 polygon_first
+                        // 更新 polygon_first   裁剪完后写回polygons_
                         polygon_first.points.clear();
                         geometry_msgs::msg::Point32 pt32;
                         
@@ -343,7 +343,7 @@ namespace garage_utils_pkg
                         RCLCPP_INFO(get_logger(), "print polygons after cutting.");
                         print_polygons(this->polygons_);
 
-                        // 1、generate model
+                        // 1、generate model    把通道变成线
                         std::vector<std::vector<Point>> rects;
                         for (size_t i = 0; i < this->polygons_.size(); i++)
                         {
@@ -391,7 +391,7 @@ namespace garage_utils_pkg
                                 RCLCPP_INFO(get_logger(), "adjacent: [ %s]", ss.str().c_str());
                         }
 
-                        // 2、把points排序，生成路线
+                        // 2、把points排序，生成路线    DFS遍历 + 子树距离贪心排序
                         int start_index = path_searcher_->get_start_point_index(robot_x, robot_y, points);
                         path_searcher_->process_(points, start_index);
 
@@ -473,7 +473,7 @@ namespace garage_utils_pkg
 
         double ComputeRightEdgePathActionServer::theta_between_two_edges(Point seg1_pt1, Point seg1_pt2, Point seg2_pt1, Point seg2_pt2)
         {
-              // 计算两条线段的方向向量
+              // 计算两条线段的方向向量                     //区分裁剪通道的长边还是短边
                 const double vec1_x = seg1_pt2.first - seg1_pt1.first;
                 const double vec1_y = seg1_pt2.second - seg1_pt1.second;
                 const double vec2_x = seg2_pt2.first - seg2_pt1.first;
@@ -501,7 +501,7 @@ namespace garage_utils_pkg
 
         double ComputeRightEdgePathActionServer::point_to_line_distance_smart(double px, double py, double x1, double y1, double x2, double y2)
         {                
-                double fx, fy; // 点到线段的垂线与线段所在的直线的交点
+                double fx, fy; // 点到线段的垂线与线段所在的直线的交点                              // 是判断点离哪条边更"近"时做比较
                 double t;      // fy = y1 + t * (y2 - y1); fx = x1 + t * (x2 - x1)
                 double dx = x2 - x1;
                 double dy = y2 - y1;
@@ -530,7 +530,7 @@ namespace garage_utils_pkg
                         return (distance(px, py, x1, y1) + distance(px, py, x2, y2)) / 2.0;
                 }
         }
-
+        // 用车和机器人的相对方位算：车是否在机器人“身后一侧”、夹角是否 ≥ 90°
         bool ComputeRightEdgePathActionServer::calculate_robot_need_turn(double robot_x, double robot_y, double robot_theta,
                                double car_x, double car_y) 
         {   
