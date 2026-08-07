@@ -17,7 +17,8 @@
       <Sequence>
         <!-- <SubTree ID="NavigatoToPose" __shared_blackboard="true" /> -->
         <WeltModelNode goal_pose="{free_point}" state="{state}" />
-        <WaitForCarsGone idle_timeout="15" />
+        <!-- max_wait=-1 表示不启用总超时(车流不断就一直等);要启用时改成数值即可,如 max_wait="60" -->
+        <WaitForCarsGone idle_timeout="15" max_wait="-1" />
       </Sequence>      
       
     </Fallback>
