@@ -12,7 +12,7 @@
 namespace garage_utils_pkg
 {
 
-class WaitForCarsGone : public BT::ActionNode
+class WaitForCarsGone : public BT::ActionNodeBase
 {
 public:
 

@@ -1,1 +1,10 @@
 cyclonedds.log
+
+# colcon 编译产物
+build/
+install/
+log/
+
+# 本地复制进来的依赖接口包(由 anthor/ 提供,不纳入本仓库)
+capella_ros_msg/
+capella_ros_service_interfaces/

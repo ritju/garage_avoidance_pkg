@@ -8,7 +8,7 @@ namespace garage_utils_pkg
 WaitForCarsGone::WaitForCarsGone(
   const std::string & name,
   const BT::NodeConfiguration & conf)
-: BT::ActionNode(name, conf)
+: BT::ActionNodeBase(name, conf)
 {
   node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
 
@@ -69,7 +69,7 @@ BT::NodeStatus WaitForCarsGone::tick()
 void WaitForCarsGone::halt()
 {
   started_ = false;
-  BT::ActionNode::halt();
+  BT::ActionNodeBase::halt();
 }
 
 void WaitForCarsGone::carInformationCallback(
