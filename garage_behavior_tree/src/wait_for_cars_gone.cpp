@@ -68,8 +68,10 @@ BT::NodeStatus WaitForCarsGone::tick()
 
 void WaitForCarsGone::halt()
 {
+  // 注意:BT v3 的 ActionNodeBase 没有实现 halt()(TreeNode::halt 是纯虚),
+  // 因此这里不能调用 BT::ActionNodeBase::halt(),否则 dlopen 插件时报
+  // undefined symbol: BT::TreeNode::halt()。
   started_ = false;
-  BT::ActionNodeBase::halt();
 }
 
 void WaitForCarsGone::carInformationCallback(
