@@ -16,6 +16,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(nav2_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(behaviortree_cpp_v3 REQUIRED)
+find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
@@ -29,14 +30,13 @@ include_directories(
   include
 )
 
-set(library_name ${PROJECT_NAME})
-
 set(dependencies
   ament_cmake
   nav2_common
   rclcpp
   rclcpp_action
   rclcpp_lifecycle
+  builtin_interfaces
   geometry_msgs
   nav2_msgs
   nav_msgs
@@ -91,7 +91,6 @@ ament_export_include_directories(
 )
 
 ament_export_libraries(
-  ${library_name}
   ${plugin_libs}
 )
 
