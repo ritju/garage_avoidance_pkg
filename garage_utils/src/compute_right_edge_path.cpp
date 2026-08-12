@@ -659,7 +659,7 @@ namespace garage_utils_pkg
                 RCLCPP_INFO(get_logger(), "print first enhanced rect info before cutting.");
                 print_rect(enhanced_rect);
 
-                // 对起点边框进行切割
+                // 对起点边框进行切割        将排序后的矩形四个顶点，依次两两连接，构建出矩形的四条边
                 // 找到两条长边框(和middle_long_line的夹角最小的两条边)
                 std::vector<std::pair<Point, Point>> edges;
                 for (size_t i = 0; i < enhanced_rect.vertices.size(); i++)
@@ -692,7 +692,7 @@ namespace garage_utils_pkg
                 
                 // 选取原有的两个顶点
                 Point p1_selected, p2_selected;
-
+                // 保证裁剪后的矩形包含机器人前方需要通行的区域，而丢弃机器人已经走过的身后区域
                 double l1_x = long_line1.second.first - long_line1.first.first;
                 double l1_y = long_line1.second.second - long_line1.first.second;
                 double l2_x = long_line2.second.first - long_line2.first.first;
