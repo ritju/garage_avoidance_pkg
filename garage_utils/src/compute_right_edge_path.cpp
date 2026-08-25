@@ -432,6 +432,7 @@ namespace garage_utils_pkg
                         for (size_t i = 0; i < this->path_.poses.size(); i++)
                         {
                                 this->path_.poses[i].header.stamp = stamp;
+                                this->path_.poses[i].pose.position.z = i;
                         }
 
                         // 4、publish path
