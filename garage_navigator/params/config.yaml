@@ -62,6 +62,9 @@ bt_garage_navigator:
       - nav2_collision_recover_node
       - nav2_is_collision_node
       - nav2_path_check_bt_node
+      - nav2_convert_goals_to_path_action_bt_node
+      - nav2_is_moving_condition_bt_node
+      - nav2_clear_path_action_bt_node
 
 lifecycle_manager:
   ros__parameters:
