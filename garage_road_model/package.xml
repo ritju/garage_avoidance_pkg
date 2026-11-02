@@ -3,7 +3,7 @@
 <package format="3">
   <name>garage_road_model</name>
   <version>0.1.0</version>
-  <description>从道路多边形提取骨架并拟合参考曲线。</description>
+  <description>从道路多边形恢复两条长侧边并分别拟合。</description>
   <maintainer email="dev@todo.todo">dev</maintainer>
   <license>Apache-2.0</license>
 
