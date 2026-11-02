@@ -1,0 +1,9 @@
+uint32 source_index
+geometry_msgs/Polygon boundary
+geometry_msgs/Polygon start_cap
+geometry_msgs/Polygon end_cap
+SideBoundary side_a
+SideBoundary side_b
+bool valid
+string stage
+string reason

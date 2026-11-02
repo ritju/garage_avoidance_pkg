@@ -9,7 +9,6 @@ compute_right_edge_path_action_server:
     offset: 0.8          #路径距长边的偏移量，单位米
     resolution: 1.0      #path中点与点之间的距离，单位米
     allow_inverse: false #是否允许生成相反方向的路径，主要用于机器人无法调头的情况。
-
 test_compute_right_edge_path:
   ros__parameters:
     car_pose_x: 2.0

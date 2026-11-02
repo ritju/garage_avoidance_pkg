@@ -68,30 +68,6 @@ ament_target_dependencies(${library_name}
 
 rclcpp_components_register_nodes(${library_name} "garage_utils_pkg::BtNavigator")
 
-# test node
-add_executable(test_action src/test.cpp)
-ament_target_dependencies(test_action
-  ${dependencies}
-)
-
-# test for /global_costmap
-add_executable(test_global_costmap src/sub_global_costmap.cpp)
-ament_target_dependencies(test_global_costmap
-  ${dependencies}
-)
-
-# polygons_markers_pub node
-add_executable(publisher_polygons_marker src/pub_polygons_markers.cpp)
-ament_target_dependencies(publisher_polygons_marker
-  ${dependencies}
-)
-
-# nav_through_poses test node
-add_executable(test_nav_through_poses src/navigate_through_poses_test.cpp)
-ament_target_dependencies(test_nav_through_poses
-  ${dependencies}
-)
-
 install(TARGETS ${library_name}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib

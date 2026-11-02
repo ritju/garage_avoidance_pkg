@@ -1,0 +1,5 @@
+<launch>
+  <node pkg="garage_road_model" exec="road_model_node" name="garage_road_model" output="screen">
+    <param from="$(find-pkg-share garage_road_model)/config/params.yaml"/>
+  </node>
+</launch>
