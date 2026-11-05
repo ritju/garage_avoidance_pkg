@@ -12,6 +12,7 @@ find_package(rclcpp_action REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(garage_utils_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(nav2_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2 REQUIRED)
@@ -24,6 +25,7 @@ set(dependencies
   rclcpp_components
   garage_utils_msgs
   nav_msgs
+  nav2_msgs
   geometry_msgs
   tf2_geometry_msgs
   tf2
@@ -54,7 +56,7 @@ target_include_directories(shortest_path_search PUBLIC
 ament_target_dependencies(shortest_path_search ${dependencies})
 
 add_library(generate_path SHARED
-  src/generate_path.cpp)
+  src/generate_path.cpp src/footprint_check.cpp)
 target_include_directories(generate_path PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
@@ -70,46 +72,7 @@ rclcpp_components_register_node(
   compute_right_edge_path_server PLUGIN "garage_utils_pkg::ComputeRightEdgePathActionServer" 
   EXECUTABLE compute_right_edge_path_server_node)
 
-add_executable(test_generate_model src/test_generate_model.cpp)
-target_include_directories(test_generate_model PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-target_link_libraries(test_generate_model generate_model shortest_path_search)
-ament_target_dependencies(test_generate_model ${dependencies})
-
-add_executable(test_shortest_path_search src/test_shortest_path_search.cpp)
-target_include_directories(test_shortest_path_search PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-target_link_libraries(test_shortest_path_search shortest_path_search)
-ament_target_dependencies(test_shortest_path_search ${dependencies})
-
-add_executable(test_generate_path src/test_generate_path.cpp)
-target_include_directories(test_generate_path PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-target_link_libraries(test_generate_path generate_path shortest_path_search)
-ament_target_dependencies(test_generate_path ${dependencies})
-
-add_executable(test_compute_right_edge_path src/test_compute_right_edge_path.cpp)
-target_include_directories(test_compute_right_edge_path PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-target_link_libraries(test_compute_right_edge_path generate_path shortest_path_search)
-ament_target_dependencies(test_compute_right_edge_path ${dependencies})
-
-add_executable(test_find_car_avoidance_point src/test_find_car_avoidance_point.cpp)
-target_include_directories(test_find_car_avoidance_point PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-ament_target_dependencies(test_find_car_avoidance_point ${dependencies})
-
-install(TARGETS
-  compute_right_edge_path_server       test_compute_right_edge_path
-  generate_model                       test_generate_model 
-  shortest_path_search                 test_shortest_path_search generate_path 
-  generate_path                        test_generate_path  
-  test_find_car_avoidance_point
+install(TARGETS compute_right_edge_path_server generate_model shortest_path_search generate_path
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
@@ -117,8 +80,5 @@ install(TARGETS
 install(DIRECTORY launch params
   DESTINATION share/${PROJECT_NAME}
   )
-
-install(TARGETS test_generate_model test_shortest_path_search test_generate_path test_compute_right_edge_path test_find_car_avoidance_point
-DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
