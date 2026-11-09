@@ -29,6 +29,7 @@ add_library(road_model_core SHARED
   src/geometry.cpp
   src/polygon_processor.cpp
   src/curve_fit.cpp
+  src/road_model_query.cpp
 )
 target_include_directories(road_model_core PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -38,7 +39,6 @@ target_link_libraries(road_model_core PUBLIC Eigen3::Eigen)
 
 if(garage_utils_msgs_FOUND)
   add_executable(road_model_node
-    src/main.cpp
     src/road_model_node.cpp
     src/visualization.cpp
   )

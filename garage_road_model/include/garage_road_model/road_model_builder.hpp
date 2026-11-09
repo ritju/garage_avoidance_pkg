@@ -10,7 +10,7 @@ namespace garage_road_model
 class RoadModelBuilder
 {
 public:
-  // 校验边界、切出长边、拟合两侧并输出采样。
+  // 校验边界、切出长边，再沿两条长边采样。
   RoadModelData build(
     const std::vector<Eigen::Vector2d> & boundary,
     uint32_t source_index,

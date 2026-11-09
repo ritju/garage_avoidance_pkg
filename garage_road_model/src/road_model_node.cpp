@@ -14,7 +14,6 @@
 namespace garage_road_model
 {
 
-// 把道路模型画成标记，实现在 visualization.cpp。
 visualization_msgs::msg::MarkerArray makeMarkers(
   const std::vector<RoadModelData> & roads,
   const std::string & frame_id,
@@ -68,20 +67,16 @@ garage_road_model::msg::RoadModelArray toMessage(
   for (const auto & road : roads) {
     garage_road_model::msg::RoadModel item;
     item.source_index = road.source_index;
-    item.boundary = toPolygon(road.boundary);
     item.start_cap = toPolygon(road.start_cap);
     item.end_cap = toPolygon(road.end_cap);
     item.side_a = toSide(road.side_a);
     item.side_b = toSide(road.side_b);
-    item.valid = road.valid;
-    item.stage = road.stage;
-    item.reason = road.valid ? "" : road.stage + ": " + road.reason;
     message.roads.push_back(item);
   }
   return message;
 }
 
-// 用顶点坐标给这批通道生成缓存键。
+// 判断多边形是否发生变化。
 std::string fingerprint(const std::vector<std::vector<Eigen::Vector2d>> & polygons)
 {
   std::ostringstream text;
@@ -96,7 +91,7 @@ std::string fingerprint(const std::vector<std::vector<Eigen::Vector2d>> & polygo
   return text.str();
 }
 
-// 从节点参数读出拟合配置。
+// 从节点参数读出切边和采样配置。
 ModelConfig configFrom(rclcpp::Node & node)
 {
   ModelConfig config;
@@ -106,15 +101,7 @@ ModelConfig configFrom(rclcpp::Node & node)
   config.junction_angle_rad = node.get_parameter("junction_angle_rad").as_double();
   config.width_success_fraction = node.get_parameter("width_success_fraction").as_double();
   config.piece_angle_rad = node.get_parameter("piece_angle_rad").as_double();
-  config.resample_spacing = node.get_parameter("resample_spacing").as_double();
-  config.sample_spacing = node.get_parameter("sample_spacing").as_double();
   config.output_sample_spacing = node.get_parameter("output_sample_spacing").as_double();
-  config.max_fit_error = node.get_parameter("max_fit_error").as_double();
-  config.fit_attempts = static_cast<int>(node.get_parameter("fit_attempts").as_int());
-  config.initial_lambda = node.get_parameter("initial_lambda").as_double();
-  config.max_controls = static_cast<int>(node.get_parameter("max_controls").as_int());
-  config.control_spacing = node.get_parameter("control_spacing").as_double();
-  config.curve_check_spacing = node.get_parameter("curve_check_spacing").as_double();
   config.frame_id = node.get_parameter("frame_id").as_string();
   return config;
 }
@@ -124,7 +111,7 @@ ModelConfig configFrom(rclcpp::Node & node)
 class RoadModelNode : public rclcpp::Node
 {
 public:
-  // 声明拟合参数，订阅通道并发布道路模型。
+  // 声明切边和采样参数，订阅通道并发布道路模型。
   RoadModelNode()
   : Node("garage_road_model")
   {
@@ -134,15 +121,7 @@ public:
     declare_parameter("junction_angle_rad", 0.7);
     declare_parameter("width_success_fraction", 0.45);
     declare_parameter("piece_angle_rad", 0.5);
-    declare_parameter("resample_spacing", 0.2);
-    declare_parameter("sample_spacing", 0.2);
     declare_parameter("output_sample_spacing", 0.5);
-    declare_parameter("max_fit_error", 0.08);
-    declare_parameter("fit_attempts", 5);
-    declare_parameter("initial_lambda", 1.0);
-    declare_parameter("max_controls", 48);
-    declare_parameter("control_spacing", 1.2);
-    declare_parameter("curve_check_spacing", 0.05);
     declare_parameter("frame_id", "map");
 
     const auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
@@ -162,7 +141,7 @@ public:
           const std::string & name = parameter.get_name();
           if (parameter.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE) {
             const double value = parameter.as_double();
-            if (value <= 0.0 && name != "initial_lambda") {
+            if (value <= 0.0) {
               result.successful = false;
               result.reason = name + " 必须为正";
               return result;
@@ -178,8 +157,6 @@ public:
             else if (name == "junction_angle_rad") {preview.junction_angle_rad = value;}
             else if (name == "width_success_fraction") {preview.width_success_fraction = value;}
             else if (name == "piece_angle_rad") {preview.piece_angle_rad = value;}
-            else if (name == "resample_spacing") {preview.resample_spacing = value;}
-            else if (name == "sample_spacing") {preview.sample_spacing = value;}
             else if (name == "output_sample_spacing") {
               if (!std::isfinite(value)) {
                 result.successful = false;
@@ -188,19 +165,6 @@ public:
               }
               preview.output_sample_spacing = value;
             }
-            else if (name == "max_fit_error") {preview.max_fit_error = value;}
-            else if (name == "initial_lambda") {preview.initial_lambda = value;}
-            else if (name == "control_spacing") {preview.control_spacing = value;}
-            else if (name == "curve_check_spacing") {preview.curve_check_spacing = value;}
-          } else if (parameter.get_type() == rclcpp::ParameterType::PARAMETER_INTEGER) {
-            const int value = static_cast<int>(parameter.as_int());
-            if (value <= 0) {
-              result.successful = false;
-              result.reason = name + " 必须为正";
-              return result;
-            }
-            if (name == "fit_attempts") {preview.fit_attempts = value;}
-            else if (name == "max_controls") {preview.max_controls = value;}
           } else if (name == "frame_id") {
             preview.frame_id = parameter.as_string();
           }
@@ -216,7 +180,7 @@ public:
     worker_ = std::thread([this]() {loop();});
   }
 
-  // 停止后台拟合线程。
+  // 停止后台建模线程。
   ~RoadModelNode() override
   {
     {
@@ -230,7 +194,7 @@ public:
   }
 
 private:
-  // 收到通道多边形后交给后台拟合。
+  // 收到通道多边形后交给后台建模。
   void onPolygons(const garage_utils_msgs::msg::Polygons::SharedPtr & msg)
   {
     std::vector<std::vector<Eigen::Vector2d>> polygons;
@@ -254,7 +218,7 @@ private:
     wake_.notify_one();
   }
 
-  // 拟合开始前先发布“建模中”。
+  // 采样开始前先发布“建模中”。
   void publishBuilding(
     const std::vector<std::vector<Eigen::Vector2d>> & polygons,
     uint64_t revision)
@@ -263,16 +227,12 @@ private:
     for (size_t i = 0; i < polygons.size(); ++i) {
       RoadModelData road;
       road.source_index = static_cast<uint32_t>(i);
-      road.boundary = polygons[i];
-      road.valid = false;
-      road.stage = "建模";
-      road.reason = "BUILDING";
       roads.push_back(road);
     }
     model_pub_->publish(toMessage(roads, revision, get_parameter("frame_id").as_string()));
   }
 
-  // 后台按最新通道和参数拟合，并发布结果。
+  // 后台按最新通道和参数采样，并发布结果。
   void loop()
   {
     RoadModelBuilder builder;
@@ -368,4 +328,9 @@ int runRoadModelNode(int argc, char ** argv)
   rclcpp::spin(node);
   rclcpp::shutdown();
   return 0;
+}
+
+int main(int argc, char ** argv)
+{
+  return runRoadModelNode(argc, argv);
 }

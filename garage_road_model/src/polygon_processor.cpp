@@ -346,7 +346,7 @@ bool smallerPoint(const Eigen::Vector2d & a, const Eigen::Vector2d & b)
 
 }  // namespace
 
-// 把闭合边界切成两个端口和两条长边。失败时抛出错误，不硬选。
+// 把闭合边界切成两个端口和两条长边。
 BoundarySplit splitBoundary(
   const std::vector<Eigen::Vector2d> & boundary,
   const ModelConfig & config)
@@ -480,7 +480,6 @@ BoundarySplit splitBoundary(
   const int end = start == first ? second : first;
 
   BoundarySplit split;
-  split.boundary = ring;
   split.start_cap = chains[static_cast<size_t>(start)].points;
   split.end_cap = chains[static_cast<size_t>(end)].points;
   split.side_a = betweenCaps(chains, start, end);

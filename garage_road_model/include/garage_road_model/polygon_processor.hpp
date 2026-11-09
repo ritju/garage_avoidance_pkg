@@ -13,7 +13,6 @@ std::vector<Eigen::Vector2d> validatePolygon(const std::vector<Eigen::Vector2d> 
 // 闭合边界切出的两个端口和两条长边。
 struct BoundarySplit
 {
-  std::vector<Eigen::Vector2d> boundary;
   std::vector<Eigen::Vector2d> start_cap;
   std::vector<Eigen::Vector2d> end_cap;
   std::vector<Eigen::Vector2d> side_a;

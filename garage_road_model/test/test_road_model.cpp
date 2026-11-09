@@ -58,14 +58,13 @@ std::vector<Eigen::Vector2d> arcBand(double inner, double outer, double sweep, i
 
 TEST(SideSplit, RectangleKeepsBothLongEdges)
 {
-  const auto model = build({{0, 0}, {20, 0}, {20, 2}, {0, 2}});
+  const std::vector<Eigen::Vector2d> corridor{{0, 0}, {20, 0}, {20, 2}, {0, 2}};
+  const auto model = build(corridor);
   ASSERT_TRUE(model.valid) << model.stage << " " << model.reason;
   EXPECT_NEAR(model.side_a.length, 20.0, 0.05);
   EXPECT_NEAR(model.side_b.length, 20.0, 0.05);
   EXPECT_NEAR(std::min(sideMeanY(model.side_a), sideMeanY(model.side_b)), 0.0, 0.02);
   EXPECT_NEAR(std::max(sideMeanY(model.side_a), sideMeanY(model.side_b)), 2.0, 0.02);
-  EXPECT_LT(model.side_a.max_error, 0.02);
-  EXPECT_LT(model.side_b.max_error, 0.02);
   EXPECT_NEAR(model.start_cap.front().x(), model.start_cap.back().x(), 1e-6);
 
   RoadModelQuery query(model);
@@ -75,7 +74,7 @@ TEST(SideSplit, RectangleKeepsBothLongEdges)
   const auto near_top = query.nearestSide(Eigen::Vector2d(10, 1.8));
   ASSERT_EQ(near_top.status, QueryStatus::Ok);
   EXPECT_EQ(near_top.side, SideId::B);
-  const auto section = query.localCrossSection(SideId::A, 10.0);
+  const auto section = query.localCrossSection(SideId::A, 10.0, corridor);
   ASSERT_EQ(section.status, QueryStatus::Ok);
   EXPECT_NEAR(section.width, 2.0, 0.05);
 }

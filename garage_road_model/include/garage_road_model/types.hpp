@@ -23,17 +23,10 @@ struct ModelConfig
   double junction_angle_rad{0.7};
   // 沿侧边采样时，朝对侧打中且连线在多边形内的比例下限。
   double width_success_fraction{0.45};
-  // 侧边内部超过该转角（弧度）就分段，避免把真实拐角拟合成圆角。
+  // 长边内部超过该转角（弧度）就标成拐角，该处没有唯一法线。
   double piece_angle_rad{0.5};
-  double resample_spacing{0.2};
-  double sample_spacing{0.2};
+  // 沿长边发布采样点的弧长间隔（米）。端点和拐角另外保留。
   double output_sample_spacing{0.5};
-  double max_fit_error{0.08};
-  int fit_attempts{5};
-  double initial_lambda{1.0};
-  int max_controls{48};
-  double control_spacing{1.2};
-  double curve_check_spacing{0.05};
   std::string frame_id{"map"};
 };
 
@@ -43,7 +36,6 @@ struct RoadSampleData
   double y{0.0};
   double yaw{0.0};
   double s{0.0};
-  double curvature{0.0};
   bool corner{false};
 };
 
@@ -52,14 +44,11 @@ struct SideBoundary
   std::vector<Eigen::Vector2d> raw;
   std::vector<RoadSampleData> samples;
   double length{0.0};
-  double max_error{0.0};
-  double mean_error{0.0};
 };
 
 struct RoadModelData
 {
   uint32_t source_index{0};
-  std::vector<Eigen::Vector2d> boundary;
   std::vector<Eigen::Vector2d> start_cap;
   std::vector<Eigen::Vector2d> end_cap;
   SideBoundary side_a;

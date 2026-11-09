@@ -21,9 +21,11 @@ public:
 
   SidePose evaluateSide(SideId side, double s) const;
 
-  InwardNormal inwardNormal(SideId side, double s) const;
+  InwardNormal inwardNormal(
+    SideId side, double s, const std::vector<Eigen::Vector2d> & corridor) const;
 
-  CrossSection localCrossSection(SideId side, double s) const;
+  CrossSection localCrossSection(
+    SideId side, double s, const std::vector<Eigen::Vector2d> & corridor) const;
 
   const RoadModelData & model() const {return model_;}
 

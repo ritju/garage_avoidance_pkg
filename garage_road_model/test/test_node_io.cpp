@@ -104,10 +104,11 @@ TEST(RoadModelNode, PublishesFitAndClearsEmptyInput)
     };
   pub->publish(rectangle());
   ASSERT_TRUE(wait_for([&]() {
-      return got && !latest.roads.empty() && latest.roads.front().valid;
+      return got && !latest.roads.empty() &&
+             latest.roads.front().side_a.samples.size() >= 2 &&
+             latest.roads.front().side_b.samples.size() >= 2;
     }));
   ASSERT_EQ(latest.roads.size(), 1U);
-  EXPECT_TRUE(latest.roads.front().valid) << latest.roads.front().reason;
   EXPECT_EQ(latest.roads.front().source_index, 0U);
   EXPECT_GT(latest.roads.front().side_a.length, 18.0);
   EXPECT_GT(latest.roads.front().side_b.length, 18.0);
@@ -125,12 +126,12 @@ TEST(RoadModelNode, PublishesFitAndClearsEmptyInput)
   const uint64_t empty_revision = latest.revision;
   ASSERT_TRUE(wait_for([&]() {
       return got && latest.revision != empty_revision && !latest.roads.empty() &&
-             !latest.roads.front().valid &&
-             latest.roads.front().reason.find("自交") != std::string::npos;
+             latest.roads.front().side_a.samples.empty() &&
+             latest.roads.front().side_b.samples.empty();
     }));
   ASSERT_FALSE(latest.roads.empty());
-  EXPECT_FALSE(latest.roads.front().valid);
-  EXPECT_NE(latest.roads.front().reason.find("自交"), std::string::npos);
+  EXPECT_TRUE(latest.roads.front().side_a.samples.empty());
+  EXPECT_TRUE(latest.roads.front().side_b.samples.empty());
   EXPECT_EQ(latest.roads.front().source_index, 0U);
   rclcpp::shutdown();
 }

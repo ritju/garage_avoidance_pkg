@@ -6,14 +6,6 @@
     junction_angle_rad: 0.7
     width_success_fraction: 0.45
     piece_angle_rad: 0.5
-    resample_spacing: 0.2
-    sample_spacing: 0.2
-    # 发布点沿整条侧边的累计距离间隔（米）；端点、拐角及必要的形状点额外保留。
+    # 发布点沿整条侧边的累计距离间隔（米）；端点和拐角另外保留。
     output_sample_spacing: 0.5
-    max_fit_error: 0.08
-    fit_attempts: 5
-    initial_lambda: 1.0
-    max_controls: 48
-    control_spacing: 1.2
-    curve_check_spacing: 0.05
     frame_id: map

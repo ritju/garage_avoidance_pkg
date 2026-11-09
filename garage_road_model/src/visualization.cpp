@@ -9,7 +9,7 @@
 namespace garage_road_model
 {
 
-// 把边界、端口和两条拟合边画成标记。
+// 把端口和两条采样长边画成标记。通道外框用 garage_polygons，这里不再画一份。
 visualization_msgs::msg::MarkerArray makeMarkers(
   const std::vector<RoadModelData> & roads,
   const std::string & frame_id,
@@ -46,23 +46,6 @@ visualization_msgs::msg::MarkerArray makeMarkers(
     };
 
   for (const auto & road : roads) {
-    auto boundary = add("boundary", visualization_msgs::msg::Marker::LINE_STRIP, 0.2F, 0.4F, 1.F, 0.04F);
-    for (const auto & point : road.boundary) {
-      geometry_msgs::msg::Point p;
-      p.x = point.x();
-      p.y = point.y();
-      boundary.points.push_back(p);
-    }
-    if (!road.boundary.empty()) {
-      geometry_msgs::msg::Point p;
-      p.x = road.boundary.front().x();
-      p.y = road.boundary.front().y();
-      boundary.points.push_back(p);
-    }
-    if (boundary.points.size() >= 2) {
-      array.markers.push_back(boundary);
-    }
-
     // 把一组点画成折线或点。
     auto drawChain = [&](const std::string & ns, const std::vector<Eigen::Vector2d> & points,
       int type, float r, float g, float b, float scale) {
@@ -82,7 +65,7 @@ visualization_msgs::msg::MarkerArray makeMarkers(
     drawChain("side_a_raw", road.side_a.raw, visualization_msgs::msg::Marker::POINTS, 0.9F, 0.45F, 0.4F, 0.06F);
     drawChain("side_b_raw", road.side_b.raw, visualization_msgs::msg::Marker::POINTS, 0.4F, 0.75F, 0.45F, 0.06F);
 
-    // 画出拟合曲线，并标出几个切线方向。
+    // 画出采样折线，并标出几个切线方向。
     auto drawFit = [&](const std::string & ns, const SideBoundary & side, float r, float g, float b) {
         auto curve = add(ns, visualization_msgs::msg::Marker::LINE_STRIP, r, g, b, 0.05F);
         for (const auto & sample : side.samples) {
