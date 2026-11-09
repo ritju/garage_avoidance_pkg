@@ -14,6 +14,7 @@
 namespace garage_road_model
 {
 
+// 把道路模型画成标记，实现在 visualization.cpp。
 visualization_msgs::msg::MarkerArray makeMarkers(
   const std::vector<RoadModelData> & roads,
   const std::string & frame_id,
@@ -23,6 +24,7 @@ visualization_msgs::msg::MarkerArray makeMarkers(
 namespace
 {
 
+// 把点列转成 ROS 多边形。
 geometry_msgs::msg::Polygon toPolygon(const std::vector<Eigen::Vector2d> & points)
 {
   geometry_msgs::msg::Polygon polygon;
@@ -35,6 +37,7 @@ geometry_msgs::msg::Polygon toPolygon(const std::vector<Eigen::Vector2d> & point
   return polygon;
 }
 
+// 把一条侧边转成道路消息。
 garage_road_model::msg::SideBoundary toSide(const SideBoundary & side)
 {
   garage_road_model::msg::SideBoundary message;
@@ -55,6 +58,7 @@ garage_road_model::msg::SideBoundary toSide(const SideBoundary & side)
   return message;
 }
 
+// 把全部道路模型转成发布消息。
 garage_road_model::msg::RoadModelArray toMessage(
   const std::vector<RoadModelData> & roads,
   uint64_t revision,
@@ -80,6 +84,7 @@ garage_road_model::msg::RoadModelArray toMessage(
   return message;
 }
 
+// 用顶点坐标给这批通道生成缓存键。
 std::string fingerprint(const std::vector<std::vector<Eigen::Vector2d>> & polygons)
 {
   std::ostringstream text;
@@ -94,6 +99,7 @@ std::string fingerprint(const std::vector<std::vector<Eigen::Vector2d>> & polygo
   return text.str();
 }
 
+// 从节点参数读出拟合配置。
 ModelConfig configFrom(rclcpp::Node & node)
 {
   ModelConfig config;
@@ -105,6 +111,7 @@ ModelConfig configFrom(rclcpp::Node & node)
   config.piece_angle_rad = node.get_parameter("piece_angle_rad").as_double();
   config.resample_spacing = node.get_parameter("resample_spacing").as_double();
   config.sample_spacing = node.get_parameter("sample_spacing").as_double();
+  config.output_sample_spacing = node.get_parameter("output_sample_spacing").as_double();
   config.max_fit_error = node.get_parameter("max_fit_error").as_double();
   config.fit_attempts = static_cast<int>(node.get_parameter("fit_attempts").as_int());
   config.initial_lambda = node.get_parameter("initial_lambda").as_double();
@@ -120,6 +127,7 @@ ModelConfig configFrom(rclcpp::Node & node)
 class RoadModelNode : public rclcpp::Node
 {
 public:
+  // 声明拟合参数，订阅通道并发布道路模型。
   RoadModelNode()
   : Node("garage_road_model")
   {
@@ -131,6 +139,7 @@ public:
     declare_parameter("piece_angle_rad", 0.5);
     declare_parameter("resample_spacing", 0.2);
     declare_parameter("sample_spacing", 0.2);
+    declare_parameter("output_sample_spacing", 0.5);
     declare_parameter("max_fit_error", 0.08);
     declare_parameter("fit_attempts", 5);
     declare_parameter("initial_lambda", 1.0);
@@ -146,6 +155,7 @@ public:
     polygon_sub_ = create_subscription<garage_utils_msgs::msg::Polygons>(
       "/garage_polygons", qos,
       [this](const garage_utils_msgs::msg::Polygons::SharedPtr msg) {onPolygons(msg);});
+    // 参数变化时检查取值，并通知后台按新参数重算。
     parameter_callback_ = add_on_set_parameters_callback(
       [this](const std::vector<rclcpp::Parameter> & parameters) {
         rcl_interfaces::msg::SetParametersResult result;
@@ -173,6 +183,14 @@ public:
             else if (name == "piece_angle_rad") {preview.piece_angle_rad = value;}
             else if (name == "resample_spacing") {preview.resample_spacing = value;}
             else if (name == "sample_spacing") {preview.sample_spacing = value;}
+            else if (name == "output_sample_spacing") {
+              if (!std::isfinite(value)) {
+                result.successful = false;
+                result.reason = "output_sample_spacing 必须是有限正数";
+                return result;
+              }
+              preview.output_sample_spacing = value;
+            }
             else if (name == "max_fit_error") {preview.max_fit_error = value;}
             else if (name == "initial_lambda") {preview.initial_lambda = value;}
             else if (name == "control_spacing") {preview.control_spacing = value;}
@@ -201,6 +219,7 @@ public:
     worker_ = std::thread([this]() {loop();});
   }
 
+  // 停止后台拟合线程。
   ~RoadModelNode() override
   {
     {
@@ -214,6 +233,7 @@ public:
   }
 
 private:
+  // 收到通道多边形后交给后台拟合。
   void onPolygons(const garage_utils_msgs::msg::Polygons::SharedPtr & msg)
   {
     std::vector<std::vector<Eigen::Vector2d>> polygons;
@@ -237,6 +257,7 @@ private:
     wake_.notify_one();
   }
 
+  // 拟合开始前先发布“建模中”。
   void publishBuilding(
     const std::vector<std::vector<Eigen::Vector2d>> & polygons,
     uint64_t revision)
@@ -254,6 +275,7 @@ private:
     model_pub_->publish(toMessage(roads, revision, get_parameter("frame_id").as_string()));
   }
 
+  // 后台按最新通道和参数拟合，并发布结果。
   void loop()
   {
     RoadModelBuilder builder;
@@ -341,6 +363,7 @@ private:
 
 }  // namespace garage_road_model
 
+// 初始化并运行道路模型节点。
 int runRoadModelNode(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);

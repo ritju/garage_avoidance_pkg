@@ -9,6 +9,7 @@
 namespace garage_road_model
 {
 
+// 把边界、端口和两条拟合边画成标记。
 visualization_msgs::msg::MarkerArray makeMarkers(
   const std::vector<RoadModelData> & roads,
   const std::string & frame_id,
@@ -25,6 +26,7 @@ visualization_msgs::msg::MarkerArray makeMarkers(
 
   auto stamp = wipe.header;
   int id = 0;
+  // 创建一个指定颜色和尺寸的标记。
   auto add = [&](const std::string & ns, int type, float r, float g, float b, float scale) {
       visualization_msgs::msg::Marker marker;
       marker.header = stamp;
@@ -61,6 +63,7 @@ visualization_msgs::msg::MarkerArray makeMarkers(
       array.markers.push_back(boundary);
     }
 
+    // 把一组点画成折线或点。
     auto drawChain = [&](const std::string & ns, const std::vector<Eigen::Vector2d> & points,
       int type, float r, float g, float b, float scale) {
         auto marker = add(ns, type, r, g, b, scale);
@@ -79,6 +82,7 @@ visualization_msgs::msg::MarkerArray makeMarkers(
     drawChain("side_a_raw", road.side_a.raw, visualization_msgs::msg::Marker::POINTS, 0.9F, 0.45F, 0.4F, 0.06F);
     drawChain("side_b_raw", road.side_b.raw, visualization_msgs::msg::Marker::POINTS, 0.4F, 0.75F, 0.45F, 0.06F);
 
+    // 画出拟合曲线，并标出几个切线方向。
     auto drawFit = [&](const std::string & ns, const SideBoundary & side, float r, float g, float b) {
         auto curve = add(ns, visualization_msgs::msg::Marker::LINE_STRIP, r, g, b, 0.05F);
         for (const auto & sample : side.samples) {

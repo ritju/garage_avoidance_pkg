@@ -13,6 +13,7 @@ struct SplineCurve
   std::vector<double> knots;
   std::vector<Eigen::Vector2d> controls;
 
+  // 计算样条在参数 u 处的点。derivative 为导数阶数。
   Eigen::Vector2d evaluate(double u, int derivative = 0) const;
 };
 

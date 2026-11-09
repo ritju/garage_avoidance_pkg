@@ -1,0 +1,1635 @@
+#include "garage_road_model/boundary_splitter.hpp"
+#include "garage_road_model/curve_fitter.hpp"
+#include "garage_road_model/curve_validator.hpp"
+#include "garage_road_model/polygon_processor.hpp"
+#include "garage_road_model/road_model_builder.hpp"
+#include "garage_road_model/road_model_query.hpp"
+
+#include <Eigen/QR>
+
+#include <algorithm>
+#include <chrono>
+#include <cmath>
+#include <limits>
+#include <numeric>
+#include <utility>
+#include <vector>
+
+namespace garage_road_model
+{
+
+// 多边形检查和几何判断。
+namespace
+{
+
+constexpr double kEps = 1e-9;
+
+// 两点之间的距离。
+double distance(const Eigen::Vector2d & a, const Eigen::Vector2d & b)
+{
+  return (a - b).norm();
+}
+
+// 三点的有向面积，用来判断左右。
+double orient(const Eigen::Vector2d & a, const Eigen::Vector2d & b, const Eigen::Vector2d & c)
+{
+  return (b.x() - a.x()) * (c.y() - a.y()) - (b.y() - a.y()) * (c.x() - a.x());
+}
+
+// 多边形的有向面积。
+double polygonArea(const std::vector<Eigen::Vector2d> & points)
+{
+  double area = 0.0;
+  const int count = static_cast<int>(points.size());
+  for (int i = 0; i < count; ++i) {
+    const auto & p = points[i];
+    const auto & q = points[(i + 1) % count];
+    area += p.x() * q.y() - q.x() * p.y();
+  }
+  return 0.5 * area;
+}
+
+// 用射线法判断点是否在多边形内。
+bool containsRay(const Eigen::Vector2d & point, const std::vector<Eigen::Vector2d> & polygon)
+{
+  bool inside = false;
+  const int count = static_cast<int>(polygon.size());
+  int j = count - 1;
+  for (int i = 0; i < count; ++i) {
+    const double yi = polygon[i].y();
+    const double yj = polygon[j].y();
+    const bool crosses = (yi > point.y()) != (yj > point.y());
+    if (crosses) {
+      const double denom = std::abs(yj - yi) < 1e-15 ? 1e-15 : (yj - yi);
+      const double x_hit =
+        (polygon[j].x() - polygon[i].x()) * (point.y() - yi) / denom + polygon[i].x();
+      if (point.x() < x_hit) {
+        inside = !inside;
+      }
+    }
+    j = i;
+  }
+  return inside;
+}
+
+// 点到线段的最短距离。
+double distanceToSegment(
+  const Eigen::Vector2d & point,
+  const Eigen::Vector2d & start,
+  const Eigen::Vector2d & end)
+{
+  const Eigen::Vector2d edge = end - start;
+  const double length_sq = edge.squaredNorm();
+  if (length_sq < 1e-18) {
+    return distance(point, start);
+  }
+  double ratio = (point - start).dot(edge) / length_sq;
+  ratio = std::clamp(ratio, 0.0, 1.0);
+  return distance(point, start + ratio * edge);
+}
+
+}  // namespace
+
+// 检查边界点是否构成可用多边形。
+std::vector<Eigen::Vector2d> validatePolygon(const std::vector<Eigen::Vector2d> & boundary)
+{
+  std::vector<Eigen::Vector2d> points;
+  points.reserve(boundary.size());
+  for (const auto & point : boundary) {
+    if (!std::isfinite(point.x()) || !std::isfinite(point.y())) {
+      throw ModelError("多边形校验", "坐标不是有限值");
+    }
+    points.push_back(point);
+  }
+  if (points.size() >= 2 && distance(points.front(), points.back()) <= kEps) {
+    points.pop_back();
+  }
+
+  std::vector<Eigen::Vector2d> cleaned;
+  for (const auto & point : points) {
+    if (cleaned.empty() || distance(cleaned.back(), point) > kEps) {
+      cleaned.push_back(point);
+    }
+  }
+  if (cleaned.size() >= 2 && distance(cleaned.front(), cleaned.back()) <= kEps) {
+    cleaned.pop_back();
+  }
+
+  int unique = 0;
+  for (size_t i = 0; i < cleaned.size(); ++i) {
+    bool seen = false;
+    for (size_t j = 0; j < i; ++j) {
+      if (distance(cleaned[i], cleaned[j]) <= kEps) {
+        seen = true;
+        break;
+      }
+    }
+    if (!seen) {
+      ++unique;
+    }
+  }
+  if (unique < 3) {
+    throw ModelError("多边形校验", "至少需要三个不同顶点");
+  }
+  if (polylineSelfIntersects(cleaned, true)) {
+    throw ModelError("多边形校验", "多边形自交");
+  }
+  if (std::abs(polygonArea(cleaned)) < 1e-8) {
+    throw ModelError("多边形校验", "零面积");
+  }
+  return cleaned;
+}
+
+// 判断点是否在多边形内，允许贴着边界。
+bool pointInsidePolygon(
+  const Eigen::Vector2d & point,
+  const std::vector<Eigen::Vector2d> & polygon,
+  double tolerance)
+{
+  if (containsRay(point, polygon)) {
+    return true;
+  }
+  return distanceToEdges(point, polygon, true) <= tolerance;
+}
+
+// 点到折线的最短距离。
+double distanceToEdges(
+  const Eigen::Vector2d & point,
+  const std::vector<Eigen::Vector2d> & polyline,
+  bool closed)
+{
+  if (polyline.size() < 2) {
+    return std::numeric_limits<double>::infinity();
+  }
+  double best = std::numeric_limits<double>::infinity();
+  const int limit = closed ? static_cast<int>(polyline.size()) : static_cast<int>(polyline.size()) - 1;
+  for (int i = 0; i < limit; ++i) {
+    best = std::min(
+      best, distanceToSegment(point, polyline[i], polyline[(i + 1) % polyline.size()]));
+  }
+  return best;
+}
+
+// 判断两条线段是否相交。
+bool segmentsIntersect(
+  const Eigen::Vector2d & a,
+  const Eigen::Vector2d & b,
+  const Eigen::Vector2d & c,
+  const Eigen::Vector2d & d)
+{
+  const double o1 = orient(a, b, c);
+  const double o2 = orient(a, b, d);
+  const double o3 = orient(c, d, a);
+  const double o4 = orient(c, d, b);
+  return o1 * o2 < 0.0 && o3 * o4 < 0.0;
+}
+
+// 判断折线是否自交。
+bool polylineSelfIntersects(const std::vector<Eigen::Vector2d> & points, bool closed)
+{
+  const int count = static_cast<int>(points.size());
+  if (count < 4) {
+    return false;
+  }
+  const int edge_count = closed ? count : count - 1;
+  for (int i = 0; i < edge_count; ++i) {
+    const auto & a = points[i];
+    const auto & b = points[(i + 1) % count];
+    for (int j = i + 1; j < edge_count; ++j) {
+      if (j == i + 1) {
+        continue;
+      }
+      if (closed && i == 0 && j == edge_count - 1) {
+        continue;
+      }
+      const auto & c = points[j];
+      const auto & d = points[(j + 1) % count];
+      if (segmentsIntersect(a, b, c, d)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// 按固定间距重采样折线。
+std::vector<Eigen::Vector2d> resamplePolyline(
+  const std::vector<Eigen::Vector2d> & points,
+  double spacing)
+{
+  if (points.size() < 2 || spacing <= 0.0) {
+    return points;
+  }
+  std::vector<Eigen::Vector2d> output;
+  output.push_back(points.front());
+  double next_distance = spacing;
+  double traveled = 0.0;
+  for (size_t i = 0; i + 1 < points.size(); ++i) {
+    const Eigen::Vector2d start = points[i];
+    const Eigen::Vector2d end = points[i + 1];
+    const double segment = distance(start, end);
+    if (segment < 1e-12) {
+      continue;
+    }
+    while (traveled + segment >= next_distance - 1e-9) {
+      const double ratio = std::clamp((next_distance - traveled) / segment, 0.0, 1.0);
+      output.push_back(start + ratio * (end - start));
+      next_distance += spacing;
+    }
+    traveled += segment;
+  }
+  if (distance(output.back(), points.back()) > 1e-3) {
+    output.push_back(points.back());
+  }
+  return output;
+}
+
+
+// 把闭合边界切成两个端口和两条长边。
+namespace
+{
+
+struct Chain
+{
+  int start{0};
+  int end{0};
+  double length{0.0};
+  std::vector<Eigen::Vector2d> points;
+};
+
+// 把下标折回到闭合环上。
+int wrap(int index, int count)
+{
+  return (index % count + count) % count;
+}
+
+
+// 计算折点处的转角。
+double turnAngle(
+  const Eigen::Vector2d & before,
+  const Eigen::Vector2d & at,
+  const Eigen::Vector2d & after)
+{
+  const Eigen::Vector2d incoming = at - before;
+  const Eigen::Vector2d outgoing = after - at;
+  if (incoming.squaredNorm() < 1e-16 || outgoing.squaredNorm() < 1e-16) {
+    return 0.0;
+  }
+  return std::abs(std::atan2(incoming.x() * outgoing.y() - incoming.y() * outgoing.x(), incoming.dot(outgoing)));
+}
+
+// 按下标从环上切出一段点。
+std::vector<Eigen::Vector2d> slice(
+  const std::vector<Eigen::Vector2d> & points,
+  int begin,
+  int end)
+{
+  const int count = static_cast<int>(points.size());
+  std::vector<Eigen::Vector2d> chain;
+  int index = begin;
+  for (int guard = 0; guard <= count; ++guard) {
+    chain.push_back(points[static_cast<size_t>(index)]);
+    if (index == end) {
+      return chain;
+    }
+    index = wrap(index + 1, count);
+  }
+  throw ModelError("端口识别", "侧边索引没有闭合");
+}
+
+// 折线的总长度。
+double polylineLength(const std::vector<Eigen::Vector2d> & points)
+{
+  double length = 0.0;
+  for (size_t i = 1; i < points.size(); ++i) {
+    length += (points[i] - points[i - 1]).norm();
+  }
+  return length;
+}
+
+// 把一段点接到链上，并去掉重复的端点。
+void appendChain(std::vector<Eigen::Vector2d> & output, const std::vector<Eigen::Vector2d> & part)
+{
+  if (part.empty()) {
+    return;
+  }
+  size_t begin = 0;
+  if (!output.empty() && (output.back() - part.front()).norm() < 1e-8) {
+    begin = 1;
+  }
+  output.insert(output.end(), part.begin() + static_cast<std::ptrdiff_t>(begin), part.end());
+}
+
+// 去掉共线点，简化闭合边界。
+std::vector<int> simplifyRing(const std::vector<Eigen::Vector2d> & points, double tolerance)
+{
+  const int count = static_cast<int>(points.size());
+  std::vector<int> keep{0};
+  int start = 0;
+  for (int guard = 0; guard < count; ++guard) {
+    int best = wrap(start + 1, count);
+    for (int step = 2; step < count; ++step) {
+      const int candidate = wrap(start + step, count);
+      if (candidate == keep.front()) {
+        break;
+      }
+      bool collinear = true;
+      for (int mid_step = 1; mid_step < step; ++mid_step) {
+        const int mid = wrap(start + mid_step, count);
+        const double deviation = distanceToEdges(
+          points[static_cast<size_t>(mid)],
+          {points[static_cast<size_t>(start)], points[static_cast<size_t>(candidate)]},
+          false);
+        if (deviation > tolerance) {
+          collinear = false;
+          break;
+        }
+      }
+      if (!collinear) {
+        break;
+      }
+      best = candidate;
+    }
+    if (best == keep.front()) {
+      break;
+    }
+    keep.push_back(best);
+    start = best;
+    if (static_cast<int>(keep.size()) >= count) {
+      break;
+    }
+  }
+  return keep;
+}
+
+// 取方向向量的左侧单位法线。
+Eigen::Vector2d leftNormal(const Eigen::Vector2d & direction)
+{
+  const double length = direction.norm();
+  if (length < 1e-9) {
+    return Eigen::Vector2d::Zero();
+  }
+  return Eigen::Vector2d(-direction.y() / length, direction.x() / length);
+}
+
+// 判断射线是否打到线段。
+bool rayHitsSegment(
+  const Eigen::Vector2d & origin,
+  const Eigen::Vector2d & direction,
+  const Eigen::Vector2d & a,
+  const Eigen::Vector2d & b,
+  double & distance)
+{
+  const Eigen::Vector2d edge = b - a;
+  const double det = direction.x() * edge.y() - direction.y() * edge.x();
+  if (std::abs(det) < 1e-12) {
+    return false;
+  }
+  const Eigen::Vector2d delta = a - origin;
+  distance = (delta.x() * edge.y() - delta.y() * edge.x()) / det;
+  const double ratio = (delta.x() * direction.y() - delta.y() * direction.x()) / det;
+  return distance > 0.05 && ratio >= -1e-6 && ratio <= 1.0 + 1e-6;
+}
+
+// 判断线段是否留在多边形内部。
+bool segmentStaysInside(
+  const Eigen::Vector2d & start,
+  const Eigen::Vector2d & stop,
+  const std::vector<Eigen::Vector2d> & polygon)
+{
+  for (double ratio : {0.25, 0.5, 0.75}) {
+    if (!pointInsidePolygon(start + ratio * (stop - start), polygon, 0.05)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// 判断两条边之间的宽度是否像一条通道。
+bool widthLooksLikeCorridor(
+  const std::vector<Eigen::Vector2d> & from_side,
+  const std::vector<Eigen::Vector2d> & to_side,
+  const std::vector<Eigen::Vector2d> & polygon,
+  const std::vector<Eigen::Vector2d> & corners,
+  double cap_length,
+  double success_fraction,
+  double & score_fraction)
+{
+  int checked = 0;
+  int hits = 0;
+  std::vector<double> widths;
+  double traveled = 0.0;
+  double next_sample = 0.0;
+  for (size_t i = 1; i < from_side.size(); ++i) {
+    const Eigen::Vector2d edge = from_side[i] - from_side[i - 1];
+    const double length = edge.norm();
+    if (length < 1e-9) {
+      continue;
+    }
+    const Eigen::Vector2d normal = leftNormal(edge);
+    while (next_sample <= traveled + length + 1e-9) {
+      const double ratio = std::clamp((next_sample - traveled) / length, 0.0, 1.0);
+      const Eigen::Vector2d point = from_side[i - 1] + ratio * edge;
+      next_sample += 0.5;
+      bool near_corner = false;
+      for (const auto & corner : corners) {
+        if ((point - corner).norm() < 0.35) {
+          near_corner = true;
+          break;
+        }
+      }
+      if (near_corner || normal.squaredNorm() < 0.5) {
+        continue;
+      }
+      ++checked;
+      double best = std::numeric_limits<double>::infinity();
+      for (size_t j = 1; j < to_side.size(); ++j) {
+        double distance = 0.0;
+        if (rayHitsSegment(point, normal, to_side[j - 1], to_side[j], distance)) {
+          best = std::min(best, distance);
+        }
+      }
+      if (!std::isfinite(best)) {
+        continue;
+      }
+      const Eigen::Vector2d hit = point + best * normal;
+      if (!segmentStaysInside(point, hit, polygon)) {
+        continue;
+      }
+      ++hits;
+      widths.push_back(best);
+    }
+    traveled += length;
+  }
+  score_fraction = checked == 0 ? 0.0 : static_cast<double>(hits) / static_cast<double>(checked);
+  if (checked < 2 || score_fraction < success_fraction || widths.empty()) {
+    return false;
+  }
+  std::sort(widths.begin(), widths.end());
+  const double median = widths[widths.size() / 2];
+  return median >= 0.3 * cap_length && median <= 3.0 * cap_length;
+}
+
+// 取两个端口之间的那条侧边。
+std::vector<Eigen::Vector2d> betweenCaps(
+  const std::vector<Chain> & chains,
+  int from_cap,
+  int to_cap)
+{
+  std::vector<Eigen::Vector2d> side;
+  const int count = static_cast<int>(chains.size());
+  int index = wrap(from_cap + 1, count);
+  for (int guard = 0; index != to_cap && guard < count; ++guard) {
+    appendChain(side, chains[static_cast<size_t>(index)].points);
+    index = wrap(index + 1, count);
+  }
+  return side;
+}
+
+// 取点链的中点。
+Eigen::Vector2d chainMidpoint(const std::vector<Eigen::Vector2d> & points)
+{
+  Eigen::Vector2d sum = Eigen::Vector2d::Zero();
+  for (const auto & point : points) {
+    sum += point;
+  }
+  return points.empty() ? sum : sum / static_cast<double>(points.size());
+}
+
+// 按坐标比较两个点的先后。
+bool smallerPoint(const Eigen::Vector2d & a, const Eigen::Vector2d & b)
+{
+  if (std::abs(a.x() - b.x()) > 1e-9) {
+    return a.x() < b.x();
+  }
+  return a.y() < b.y();
+}
+
+}  // namespace
+
+// 把闭合边界切成两个端口和两条长边。
+BoundarySplit splitBoundary(
+  const std::vector<Eigen::Vector2d> & boundary,
+  const ModelConfig & config)
+{
+  if (config.collinear_tolerance <= 0.0 || config.cap_side_ratio <= 0.0 ||
+    config.cap_side_ratio >= 1.0)
+  {
+    throw ModelError("端口识别", "端头参数不合法");
+  }
+  std::vector<Eigen::Vector2d> ring = boundary;
+  if (polygonArea(ring) < 0.0) {
+    std::reverse(ring.begin(), ring.end());
+  }
+  const int count = static_cast<int>(ring.size());
+  if (count < 4) {
+    throw ModelError("端口识别", "端头不明确");
+  }
+
+  const std::vector<int> keep = simplifyRing(ring, config.collinear_tolerance);
+  if (keep.size() < 4) {
+    throw ModelError("端口识别", "端头不明确");
+  }
+  std::vector<int> corner_slots;
+  std::vector<Eigen::Vector2d> corner_points;
+  const int simplified = static_cast<int>(keep.size());
+  for (int i = 0; i < simplified; ++i) {
+    const double turn = turnAngle(
+      ring[static_cast<size_t>(keep[static_cast<size_t>(wrap(i - 1, simplified))])],
+      ring[static_cast<size_t>(keep[static_cast<size_t>(i)])],
+      ring[static_cast<size_t>(keep[static_cast<size_t>(wrap(i + 1, simplified))])]);
+    if (turn >= config.corner_angle_rad) {
+      corner_slots.push_back(i);
+      corner_points.push_back(ring[static_cast<size_t>(keep[static_cast<size_t>(i)])]);
+    }
+  }
+  if (corner_slots.size() < 4) {
+    throw ModelError("端口识别", "端头不明确");
+  }
+
+  std::vector<Chain> chains;
+  const int corner_count = static_cast<int>(corner_slots.size());
+  for (int i = 0; i < corner_count; ++i) {
+    Chain chain;
+    chain.start = keep[static_cast<size_t>(corner_slots[static_cast<size_t>(i)])];
+    chain.end = keep[static_cast<size_t>(corner_slots[static_cast<size_t>((i + 1) % corner_count)])];
+    chain.points = slice(ring, chain.start, chain.end);
+    chain.length = polylineLength(chain.points);
+    if (chain.points.size() < 2 || chain.length < 1e-4) {
+      throw ModelError("端口识别", "端头不明确");
+    }
+    chains.push_back(std::move(chain));
+  }
+
+  struct Candidate
+  {
+    int first{0};
+    int second{0};
+    double score{0.0};
+  };
+  std::vector<Candidate> candidates;
+  const int chain_count = static_cast<int>(chains.size());
+  for (int i = 0; i < chain_count; ++i) {
+    for (int j = i + 1; j < chain_count; ++j) {
+      const int between = j - i - 1;
+      const int around = chain_count - between - 2;
+      if (between < 1 || around < 1) {
+        continue;
+      }
+      const auto side_ij = betweenCaps(chains, i, j);
+      const auto side_ji = betweenCaps(chains, j, i);
+      const double side_ij_length = polylineLength(side_ij);
+      const double side_ji_length = polylineLength(side_ji);
+      const double cap_limit = config.cap_side_ratio * std::min(side_ij_length, side_ji_length);
+      if (side_ij.size() < 2 || side_ji.size() < 2 ||
+        chains[static_cast<size_t>(i)].length > cap_limit ||
+        chains[static_cast<size_t>(j)].length > cap_limit)
+      {
+        continue;
+      }
+      const double mean_cap = 0.5 * (
+        chains[static_cast<size_t>(i)].length + chains[static_cast<size_t>(j)].length);
+      double fraction_ij = 0.0;
+      double fraction_ji = 0.0;
+      if (!widthLooksLikeCorridor(
+          side_ij, side_ji, ring, corner_points, mean_cap, config.width_success_fraction, fraction_ij) ||
+        !widthLooksLikeCorridor(
+          side_ji, side_ij, ring, corner_points, mean_cap, config.width_success_fraction, fraction_ji))
+      {
+        continue;
+      }
+      bool junctions_ok = true;
+      for (const int slot : {i, j, (i + between + 1) % chain_count, (j + around + 1) % chain_count}) {
+        const auto & chain = chains[static_cast<size_t>(slot)];
+        const int previous = wrap(chain.start - 1, count);
+        const int next = wrap(chain.start + 1, count);
+        if (turnAngle(ring[static_cast<size_t>(previous)], ring[static_cast<size_t>(chain.start)],
+          ring[static_cast<size_t>(next)]) < config.junction_angle_rad)
+        {
+          junctions_ok = false;
+          break;
+        }
+      }
+      if (!junctions_ok) {
+        continue;
+      }
+      Candidate candidate;
+      candidate.first = i;
+      candidate.second = j;
+      candidate.score = std::min(side_ij_length, side_ji_length) /
+        std::max(chains[static_cast<size_t>(i)].length, chains[static_cast<size_t>(j)].length);
+      candidate.score *= 0.5 * (fraction_ij + fraction_ji);
+      candidates.push_back(candidate);
+    }
+  }
+
+  if (candidates.empty()) {
+    throw ModelError("端口识别", "端口歧义，没有可靠端头");
+  }
+  std::sort(candidates.begin(), candidates.end(), [](const Candidate & a, const Candidate & b) {
+      return a.score > b.score;
+    });
+  if (candidates.size() > 1 && candidates[0].score < candidates[1].score * 1.2) {
+    throw ModelError("端口识别", "端口歧义，候选得分接近");
+  }
+
+  const int first = candidates.front().first;
+  const int second = candidates.front().second;
+  const Eigen::Vector2d first_mid = chainMidpoint(chains[static_cast<size_t>(first)].points);
+  const Eigen::Vector2d second_mid = chainMidpoint(chains[static_cast<size_t>(second)].points);
+  const int start = smallerPoint(first_mid, second_mid) ? first : second;
+  const int end = start == first ? second : first;
+
+  BoundarySplit split;
+  split.boundary = ring;
+  split.start_cap = chains[static_cast<size_t>(start)].points;
+  split.end_cap = chains[static_cast<size_t>(end)].points;
+  split.side_a = betweenCaps(chains, start, end);
+  split.side_b = betweenCaps(chains, end, start);
+  std::reverse(split.side_b.begin(), split.side_b.end());
+  if (split.side_a.size() < 2 || split.side_b.size() < 2) {
+    throw ModelError("端口识别", "端口歧义，侧边不完整");
+  }
+  return split;
+}
+
+
+// 对一条长边做曲线拟合。
+namespace
+{
+
+// 按弦长给每个点分配拟合参数。
+std::vector<double> chordParameters(const std::vector<Eigen::Vector2d> & points)
+{
+  std::vector<double> u(points.size(), 0.0);
+  double length = 0.0;
+  for (size_t i = 1; i < points.size(); ++i) {
+    length += (points[i] - points[i - 1]).norm();
+    u[i] = length;
+  }
+  if (length < 1e-6) {
+    throw ModelError("曲线拟合", "侧边长度过短");
+  }
+  for (double & value : u) {
+    value /= length;
+  }
+  u.front() = 0.0;
+  u.back() = 1.0;
+  return u;
+}
+
+// 生成两端夹紧的样条节点。
+std::vector<double> clampedKnots(int controls, int degree)
+{
+  std::vector<double> knots(static_cast<size_t>(controls + degree + 1), 0.0);
+  const int interior = controls - degree - 1;
+  for (int i = 0; i < interior; ++i) {
+    knots[static_cast<size_t>(degree + 1 + i)] =
+      static_cast<double>(i + 1) / static_cast<double>(interior + 1);
+  }
+  for (int i = 0; i <= degree; ++i) {
+    knots[static_cast<size_t>(controls + i)] = 1.0;
+  }
+  return knots;
+}
+
+// 查找参数落在哪个节点区间。
+int findSpan(const SplineCurve & spline, double u)
+{
+  const int n = static_cast<int>(spline.controls.size());
+  const int p = spline.degree;
+  if (u >= spline.knots[static_cast<size_t>(n)]) {
+    return n - 1;
+  }
+  for (int i = p; i < n; ++i) {
+    if (u < spline.knots[static_cast<size_t>(i + 1)]) {
+      return i;
+    }
+  }
+  return n - 1;
+}
+
+// 用德布尔算法计算样条上的点。
+Eigen::Vector2d deBoor(const SplineCurve & spline, double u)
+{
+  const int p = spline.degree;
+  const int span = findSpan(spline, std::clamp(u, 0.0, 1.0));
+  std::vector<Eigen::Vector2d> local(static_cast<size_t>(p + 1));
+  for (int j = 0; j <= p; ++j) {
+    local[static_cast<size_t>(j)] = spline.controls[static_cast<size_t>(span - p + j)];
+  }
+  for (int r = 1; r <= p; ++r) {
+    for (int j = p; j >= r; --j) {
+      const int index = span - p + j;
+      const double left = spline.knots[static_cast<size_t>(index)];
+      const double right = spline.knots[static_cast<size_t>(index + p - r + 1)];
+      const double denom = right - left;
+      const double alpha = std::abs(denom) < 1e-15 ? 0.0 : (u - left) / denom;
+      local[static_cast<size_t>(j)] =
+        (1.0 - alpha) * local[static_cast<size_t>(j - 1)] + alpha * local[static_cast<size_t>(j)];
+    }
+  }
+  return local[static_cast<size_t>(p)];
+}
+
+// 求样条的导数曲线。
+SplineCurve derivativeOf(const SplineCurve & spline)
+{
+  SplineCurve derived;
+  derived.degree = spline.degree - 1;
+  if (spline.knots.size() < 2 || spline.controls.size() < 2) {
+    throw ModelError("曲线采样", "导数退化");
+  }
+  derived.knots.assign(spline.knots.begin() + 1, spline.knots.end() - 1);
+  derived.controls.reserve(spline.controls.size() - 1);
+  for (size_t i = 0; i + 1 < spline.controls.size(); ++i) {
+    const double denom = spline.knots[i + static_cast<size_t>(spline.degree) + 1] - spline.knots[i + 1];
+    const double scale = std::abs(denom) > 1e-12 ? static_cast<double>(spline.degree) / denom : 0.0;
+    derived.controls.push_back(scale * (spline.controls[i + 1] - spline.controls[i]));
+  }
+  return derived;
+}
+
+// 固定两端控制点，求解中间控制点。
+bool solveInterior(
+  const std::vector<Eigen::Vector2d> & samples,
+  const std::vector<double> & parameters,
+  int control_count,
+  double lambda,
+  SplineCurve & curve)
+{
+  const int degree = 3;
+  if (control_count < degree + 1 || samples.size() < 4) {
+    return false;
+  }
+  curve.degree = degree;
+  curve.knots = clampedKnots(control_count, degree);
+  curve.controls.assign(static_cast<size_t>(control_count), Eigen::Vector2d::Zero());
+  curve.controls.front() = samples.front();
+  curve.controls.back() = samples.back();
+
+  const int interior = control_count - 2;
+  if (interior <= 0) {
+    return false;
+  }
+  const int rows = static_cast<int>(samples.size()) + std::max(0, control_count - 2);
+  Eigen::MatrixXd matrix = Eigen::MatrixXd::Zero(rows, interior);
+  Eigen::VectorXd rhs_x = Eigen::VectorXd::Zero(rows);
+  Eigen::VectorXd rhs_y = Eigen::VectorXd::Zero(rows);
+
+  SplineCurve probe = curve;
+  for (int i = 0; i < interior; ++i) {
+    probe.controls[static_cast<size_t>(i + 1)] = Eigen::Vector2d::Zero();
+  }
+
+  for (int row = 0; row < static_cast<int>(samples.size()); ++row) {
+    const double u = parameters[static_cast<size_t>(row)];
+    Eigen::Vector2d known = Eigen::Vector2d::Zero();
+    for (int col = 0; col < control_count; ++col) {
+      probe.controls[static_cast<size_t>(col)] =
+        (col == 0 || col == control_count - 1) ? curve.controls[static_cast<size_t>(col)] :
+        Eigen::Vector2d::UnitX();
+    }
+    // Basis values by evaluating unit impulses.
+    for (int col = 0; col < control_count; ++col) {
+      for (auto & control : probe.controls) {
+        control.setZero();
+      }
+      probe.controls[static_cast<size_t>(col)] = Eigen::Vector2d::UnitX();
+      const double basis = deBoor(probe, u).x();
+      if (col == 0 || col == control_count - 1) {
+        known += basis * curve.controls[static_cast<size_t>(col)];
+      } else {
+        matrix(row, col - 1) = basis;
+      }
+    }
+    const Eigen::Vector2d residual = samples[static_cast<size_t>(row)] - known;
+    rhs_x(row) = residual.x();
+    rhs_y(row) = residual.y();
+  }
+
+  const double weight = std::sqrt(std::max(lambda, 0.0));
+  int smooth_row = static_cast<int>(samples.size());
+  for (int k = 0; k <= control_count - 3 && smooth_row < rows; ++k, ++smooth_row) {
+    auto add = [&](int control, double coefficient) {
+        if (control == 0) {
+          rhs_x(smooth_row) -= weight * coefficient * curve.controls.front().x();
+          rhs_y(smooth_row) -= weight * coefficient * curve.controls.front().y();
+        } else if (control == control_count - 1) {
+          rhs_x(smooth_row) -= weight * coefficient * curve.controls.back().x();
+          rhs_y(smooth_row) -= weight * coefficient * curve.controls.back().y();
+        } else {
+          matrix(smooth_row, control - 1) += weight * coefficient;
+        }
+      };
+    add(k, 1.0);
+    add(k + 1, -2.0);
+    add(k + 2, 1.0);
+  }
+
+  Eigen::ColPivHouseholderQR<Eigen::MatrixXd> solver(matrix);
+  if (solver.rank() < interior) {
+    return false;
+  }
+  const Eigen::VectorXd solution_x = solver.solve(rhs_x);
+  const Eigen::VectorXd solution_y = solver.solve(rhs_y);
+  if (!solution_x.allFinite() || !solution_y.allFinite()) {
+    return false;
+  }
+  for (int i = 0; i < interior; ++i) {
+    curve.controls[static_cast<size_t>(i + 1)] =
+      Eigen::Vector2d(solution_x(i), solution_y(i));
+  }
+  return true;
+}
+
+// 按弧长在样条上采样。
+std::vector<RoadSampleData> sampleByArcLength(const SplineCurve & spline, double spacing)
+{
+  constexpr int kDense = 400;
+  std::vector<double> parameter(kDense);
+  std::vector<Eigen::Vector2d> positions(kDense);
+  std::vector<double> cumulative(kDense, 0.0);
+  for (int i = 0; i < kDense; ++i) {
+    parameter[static_cast<size_t>(i)] = static_cast<double>(i) / static_cast<double>(kDense - 1);
+    positions[static_cast<size_t>(i)] = spline.evaluate(parameter[static_cast<size_t>(i)]);
+    if (i > 0) {
+      cumulative[static_cast<size_t>(i)] = cumulative[static_cast<size_t>(i - 1)] +
+        (positions[static_cast<size_t>(i)] - positions[static_cast<size_t>(i - 1)]).norm();
+    }
+  }
+  const double total = cumulative.back();
+  if (total < 1e-4) {
+    throw ModelError("曲线采样", "弧长过短");
+  }
+  const int count = std::max(2, static_cast<int>(std::ceil(total / spacing)) + 1);
+  std::vector<RoadSampleData> samples;
+  samples.reserve(static_cast<size_t>(count));
+  for (int i = 0; i < count; ++i) {
+    const double target = total * static_cast<double>(i) / static_cast<double>(count - 1);
+    auto it = std::lower_bound(cumulative.begin(), cumulative.end(), target);
+    int upper = static_cast<int>(std::distance(cumulative.begin(), it));
+    upper = std::clamp(upper, 1, kDense - 1);
+    const int lower = upper - 1;
+    const double span = cumulative[static_cast<size_t>(upper)] - cumulative[static_cast<size_t>(lower)];
+    const double ratio = span < 1e-12 ? 0.0 :
+      (target - cumulative[static_cast<size_t>(lower)]) / span;
+    const double u = parameter[static_cast<size_t>(lower)] +
+      ratio * (parameter[static_cast<size_t>(upper)] - parameter[static_cast<size_t>(lower)]);
+    const Eigen::Vector2d position = spline.evaluate(u);
+    const Eigen::Vector2d first = spline.evaluate(u, 1);
+    const Eigen::Vector2d second = spline.evaluate(u, 2);
+    const double speed_sq = first.squaredNorm();
+    if (speed_sq < 1e-10) {
+      throw ModelError("曲线采样", "导数退化");
+    }
+    const double speed = std::sqrt(speed_sq);
+    const double curvature =
+      (first.x() * second.y() - first.y() * second.x()) / (speed_sq * speed);
+    if (!std::isfinite(curvature)) {
+      throw ModelError("曲线采样", "曲率不是有限值");
+    }
+    RoadSampleData sample;
+    sample.x = position.x();
+    sample.y = position.y();
+    sample.yaw = std::atan2(first.y(), first.x());
+    sample.s = target;
+    sample.curvature = curvature;
+    samples.push_back(sample);
+  }
+  for (size_t i = 1; i < samples.size(); ++i) {
+    if (!(samples[i].s > samples[i - 1].s)) {
+      throw ModelError("曲线采样", "弧长没有严格递增");
+    }
+  }
+  return samples;
+}
+
+// 按边长估计这一段需要多少控制点。
+int initialControls(const std::vector<Eigen::Vector2d> & samples, const ModelConfig & config)
+{
+  double length = 0.0;
+  for (size_t i = 1; i < samples.size(); ++i) {
+    length += (samples[i] - samples[i - 1]).norm();
+  }
+  const int estimated = static_cast<int>(std::ceil(length / config.control_spacing)) + 4;
+  return std::clamp(estimated, 4, config.max_controls);
+}
+
+}  // namespace
+
+// 计算样条在参数处的点，导数阶数由 derivative 指定。
+Eigen::Vector2d SplineCurve::evaluate(double u, int derivative) const
+{
+  if (controls.empty() || knots.empty()) {
+    throw ModelError("曲线采样", "导数退化");
+  }
+  const double clamped = std::clamp(u, 0.0, 1.0);
+  if (derivative <= 0) {
+    return deBoor(*this, clamped);
+  }
+  if (derivative > degree) {
+    return Eigen::Vector2d::Zero();
+  }
+  SplineCurve derived = *this;
+  for (int order = 0; order < derivative; ++order) {
+    derived = derivativeOf(derived);
+  }
+  return deBoor(derived, clamped);
+}
+
+// 计算三个点之间的转角。
+double pieceTurn(const Eigen::Vector2d & before, const Eigen::Vector2d & at, const Eigen::Vector2d & after)
+{
+  const Eigen::Vector2d incoming = at - before;
+  const Eigen::Vector2d outgoing = after - at;
+  if (incoming.squaredNorm() < 1e-16 || outgoing.squaredNorm() < 1e-16) {
+    return 0.0;
+  }
+  return std::abs(std::atan2(
+      incoming.x() * outgoing.y() - incoming.y() * outgoing.x(), incoming.dot(outgoing)));
+}
+
+// 点列偏离两端连线的最大距离。
+double chordDeviation(const std::vector<Eigen::Vector2d> & piece)
+{
+  double worst = 0.0;
+  for (const auto & point : piece) {
+    worst = std::max(worst, distanceToEdges(point, {piece.front(), piece.back()}, false));
+  }
+  return worst;
+}
+
+// 给采样点的弧长加上偏移。
+void shiftSamples(std::vector<RoadSampleData> & samples, double offset, bool mark_corner)
+{
+  if (samples.empty()) {
+    return;
+  }
+  for (auto & sample : samples) {
+    sample.s += offset;
+  }
+  if (mark_corner) {
+    samples.front().corner = true;
+  }
+}
+
+// 把一段直线按间距采样。
+std::vector<RoadSampleData> sampleStraight(const std::vector<Eigen::Vector2d> & piece, double spacing)
+{
+  const Eigen::Vector2d delta = piece.back() - piece.front();
+  const double length = delta.norm();
+  if (length < 1e-4) {
+    throw ModelError("曲线拟合", "侧边长度过短");
+  }
+  const double yaw = std::atan2(delta.y(), delta.x());
+  const int count = std::max(2, static_cast<int>(std::ceil(length / spacing)) + 1);
+  std::vector<RoadSampleData> samples;
+  samples.reserve(static_cast<size_t>(count));
+  for (int i = 0; i < count; ++i) {
+    const double ratio = static_cast<double>(i) / static_cast<double>(count - 1);
+    RoadSampleData sample;
+    const Eigen::Vector2d point = piece.front() + ratio * delta;
+    sample.x = point.x();
+    sample.y = point.y();
+    sample.yaw = yaw;
+    sample.s = ratio * length;
+    sample.curvature = 0.0;
+    samples.push_back(sample);
+  }
+  return samples;
+}
+
+// 把一段折线按间距采样。
+std::vector<RoadSampleData> samplePolyline(const std::vector<Eigen::Vector2d> & piece, double spacing)
+{
+  const auto dense = resamplePolyline(piece, spacing);
+  if (dense.size() < 2) {
+    throw ModelError("曲线拟合", "侧边长度过短");
+  }
+  std::vector<RoadSampleData> samples;
+  double traveled = 0.0;
+  for (size_t i = 0; i < dense.size(); ++i) {
+    Eigen::Vector2d direction = Eigen::Vector2d::UnitX();
+    if (i + 1 < dense.size()) {
+      direction = dense[i + 1] - dense[i];
+    } else {
+      direction = dense[i] - dense[i - 1];
+    }
+    if (i > 0) {
+      traveled += (dense[i] - dense[i - 1]).norm();
+    }
+    RoadSampleData sample;
+    sample.x = dense[i].x();
+    sample.y = dense[i].y();
+    sample.yaw = std::atan2(direction.y(), direction.x());
+    sample.s = traveled;
+    sample.curvature = 0.0;
+    samples.push_back(sample);
+  }
+  return samples;
+}
+
+// 计算拟合点到原折线的误差。
+void measureError(
+  const std::vector<RoadSampleData> & samples,
+  const std::vector<Eigen::Vector2d> & source,
+  double & max_error,
+  double & mean_error)
+{
+  std::vector<Eigen::Vector2d> fitted;
+  fitted.reserve(samples.size());
+  double sum = 0.0;
+  int count = 0;
+  max_error = 0.0;
+  auto accumulate = [&](double distance) {
+      max_error = std::max(max_error, distance);
+      sum += distance;
+      ++count;
+    };
+  for (const auto & sample : samples) {
+    const Eigen::Vector2d point(sample.x, sample.y);
+    fitted.push_back(point);
+    accumulate(distanceToEdges(point, source, false));
+  }
+  for (const auto & point : source) {
+    accumulate(distanceToEdges(point, fitted, false));
+  }
+  mean_error = count == 0 ? 0.0 : sum / static_cast<double>(count);
+}
+
+// 拟合侧边上的一段。
+std::vector<RoadSampleData> fitPiece(
+  const std::vector<Eigen::Vector2d> & piece,
+  const ModelConfig & config)
+{
+  if (piece.size() < 2) {
+    throw ModelError("曲线拟合", "侧边点数不足");
+  }
+  if (chordDeviation(piece) <= config.collinear_tolerance) {
+    return sampleStraight(piece, config.sample_spacing);
+  }
+  const auto dense = resamplePolyline(piece, config.resample_spacing);
+  if (dense.size() < 4) {
+    return samplePolyline(piece, config.sample_spacing);
+  }
+  const auto parameters = chordParameters(dense);
+  int controls = std::min(initialControls(dense, config), static_cast<int>(dense.size()));
+  double lambda = config.initial_lambda;
+  std::string last_reason = "拟合误差过大";
+  for (int attempt = 0; attempt < config.fit_attempts; ++attempt) {
+    SplineCurve curve;
+    if (!solveInterior(dense, parameters, controls, lambda, curve)) {
+      last_reason = "最小二乘求解失败";
+      controls = std::max(4, controls - 1);
+      continue;
+    }
+    std::vector<RoadSampleData> samples;
+    try {
+      samples = sampleByArcLength(curve, config.sample_spacing);
+    } catch (const ModelError & error) {
+      last_reason = error.reason;
+      lambda *= 0.25;
+      continue;
+    }
+    double max_error = 0.0;
+    double mean_error = 0.0;
+    measureError(samples, piece, max_error, mean_error);
+    if (max_error <= config.max_fit_error) {
+      return samples;
+    }
+    last_reason = "拟合偏离原侧边";
+    lambda *= 0.25;
+    controls = std::min(std::min(config.max_controls, static_cast<int>(dense.size())), controls + 2);
+  }
+  throw ModelError("曲线拟合", last_reason);
+}
+
+// 拟合整条侧边。直段保持直线，转角过大就分段。
+SideBoundary fitSideChain(
+  const std::vector<Eigen::Vector2d> & chain,
+  const ModelConfig & config)
+{
+  if (chain.size() < 2) {
+    throw ModelError("曲线拟合", "侧边点数不足");
+  }
+  std::vector<std::vector<Eigen::Vector2d>> pieces;
+  std::vector<Eigen::Vector2d> current{chain.front()};
+  for (size_t i = 1; i + 1 < chain.size(); ++i) {
+    current.push_back(chain[i]);
+    if (pieceTurn(chain[i - 1], chain[i], chain[i + 1]) >= config.piece_angle_rad) {
+      pieces.push_back(current);
+      current = {chain[i]};
+    }
+  }
+  current.push_back(chain.back());
+  pieces.push_back(std::move(current));
+
+  SideBoundary side;
+  side.raw = chain;
+  for (size_t i = 0; i < pieces.size(); ++i) {
+    auto samples = fitPiece(pieces[i], config);
+    const double offset = side.samples.empty() ? 0.0 : side.samples.back().s;
+    const bool join = !side.samples.empty();
+    if (join && !samples.empty() &&
+      std::hypot(samples.front().x - side.samples.back().x, samples.front().y - side.samples.back().y) < 1e-6)
+    {
+      side.samples.back().corner = true;
+      samples.erase(samples.begin());
+    }
+    shiftSamples(samples, offset, join && !samples.empty() && !side.samples.back().corner);
+    side.samples.insert(side.samples.end(), samples.begin(), samples.end());
+  }
+  if (side.samples.size() < 2) {
+    throw ModelError("曲线拟合", "侧边采样失败");
+  }
+  side.length = side.samples.back().s;
+  measureError(side.samples, side.raw, side.max_error, side.mean_error);
+  if (side.max_error > config.max_fit_error) {
+    throw ModelError("曲线拟合", "拟合偏离原侧边");
+  }
+  return side;
+}
+
+
+// 检查拟合后的两条边有没有交叉。
+bool rejectFittedSides(
+  const SideBoundary & side_a,
+  const SideBoundary & side_b,
+  std::string & reason)
+{
+  // 取出一条侧边的采样点坐标。
+  auto pointsOf = [](const SideBoundary & side) {
+      std::vector<Eigen::Vector2d> points;
+      points.reserve(side.samples.size());
+      for (const auto & sample : side.samples) {
+        points.emplace_back(sample.x, sample.y);
+      }
+      return points;
+    };
+  const auto first = pointsOf(side_a);
+  const auto second = pointsOf(side_b);
+  if (first.size() < 2 || second.size() < 2) {
+    reason = "拟合侧边点数不足";
+    return true;
+  }
+  if (polylineSelfIntersects(first, false) || polylineSelfIntersects(second, false)) {
+    reason = "拟合侧边自交";
+    return true;
+  }
+  const int first_count = static_cast<int>(first.size());
+  const int second_count = static_cast<int>(second.size());
+  for (int i = 0; i + 1 < first_count; ++i) {
+    for (int j = 0; j + 1 < second_count; ++j) {
+      if (segmentsIntersect(first[static_cast<size_t>(i)], first[static_cast<size_t>(i + 1)],
+        second[static_cast<size_t>(j)], second[static_cast<size_t>(j + 1)]))
+      {
+        reason = "两侧拟合线交叉";
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+
+// 一条通道的拟合流程。
+namespace
+{
+// 按输出间距抽稀，保留拐角；抽稀后走样就退回密集点。
+void sampleOutput(SideBoundary & side, double spacing, double tolerance)
+{
+  if (!std::isfinite(spacing) || spacing <= 0.0) {
+    throw ModelError("输出采样", "output_sample_spacing 必须是有限正数");
+  }
+  const auto original = side.samples;
+  if (original.size() < 2) {return;}
+  const double length = original.back().s;
+  if (length / spacing > 1000000.0) {
+    throw ModelError("输出采样", "输出点数量超过上限");
+  }
+  std::vector<double> targets{original.front().s, length};
+  for (size_t k = 1; static_cast<double>(k) * spacing < length; ++k) {
+    targets.push_back(static_cast<double>(k) * spacing);
+  }
+  for (const auto & point : original) {
+    if (point.corner) {targets.push_back(point.s);}
+  }
+  std::sort(targets.begin(), targets.end());
+  targets.erase(std::unique(targets.begin(), targets.end()), targets.end());
+  std::vector<RoadSampleData> output;
+  for (double s : targets) {
+    auto upper = std::lower_bound(original.begin(), original.end(), s,
+      [](const RoadSampleData & point, double value) {return point.s < value;});
+    RoadSampleData point;
+    if (upper == original.begin() || upper == original.end() || upper->s == s) {
+      point = upper == original.end() ? original.back() : *upper;
+    } else {
+      const auto & a = *(upper - 1);
+      const auto & b = *upper;
+      const double t = (s - a.s) / (b.s - a.s);
+      point.x = a.x + t * (b.x - a.x);
+      point.y = a.y + t * (b.y - a.y);
+      point.s = s;
+      point.yaw = a.yaw + t * std::atan2(std::sin(b.yaw-a.yaw), std::cos(b.yaw-a.yaw));
+      point.curvature = a.curvature + t * (b.curvature-a.curvature);
+    }
+    if (!output.empty()) {
+      const auto start = output.back();
+      const Eigen::Vector2d a(start.x, start.y), b(point.x, point.y);
+      const auto delta = b-a;
+      bool preserve = false;
+      auto begin = std::upper_bound(original.begin(), original.end(), start.s,
+        [](double value, const RoadSampleData & item) {return value < item.s;});
+      for (auto it = begin; it != original.end() && it->s < s; ++it) {
+        const Eigen::Vector2d v(it->x, it->y);
+        const double t = delta.squaredNorm() > 1e-20 ?
+          std::clamp((v-a).dot(delta)/delta.squaredNorm(), 0.0, 1.0) : 0.0;
+        if ((v-a-t*delta).norm() > tolerance) {preserve = true; break;}
+      }
+      if (preserve) {
+        for (auto it = begin; it != original.end() && it->s < s; ++it) {
+          output.push_back(*it);
+        }
+      }
+    }
+    output.push_back(point);
+  }
+  side.samples = std::move(output);
+}
+}  // namespace
+
+// 校验边界、切出长边、拟合两侧并输出采样。
+RoadModelData RoadModelBuilder::build(
+  const std::vector<Eigen::Vector2d> & boundary,
+  uint32_t source_index,
+  const ModelConfig & config) const
+{
+  RoadModelData model;
+  model.source_index = source_index;
+  const auto started = std::chrono::steady_clock::now();
+  auto stamp = started;
+  auto mark = [&](const std::string & name) {
+      const auto now = std::chrono::steady_clock::now();
+      const double ms = std::chrono::duration<double, std::milli>(now - stamp).count();
+      model.stage_ms.emplace_back(name, ms);
+      stamp = now;
+    };
+  try {
+    model.boundary = validatePolygon(boundary);
+    mark("多边形校验");
+    const BoundarySplit split = splitBoundary(model.boundary, config);
+    model.boundary = split.boundary;
+    model.start_cap = split.start_cap;
+    model.end_cap = split.end_cap;
+    model.side_a.raw = split.side_a;
+    model.side_b.raw = split.side_b;
+    mark("端口与侧边");
+    model.side_a = fitSideChain(split.side_a, config);
+    model.side_b = fitSideChain(split.side_b, config);
+    mark("两侧拟合");
+    std::string cross_reason;
+    if (rejectFittedSides(model.side_a, model.side_b, cross_reason)) {
+      throw ModelError("曲线校验", cross_reason);
+    }
+    mark("两侧校验");
+    const auto dense_a = model.side_a;
+    const auto dense_b = model.side_b;
+    sampleOutput(model.side_a, config.output_sample_spacing, config.max_fit_error);
+    sampleOutput(model.side_b, config.output_sample_spacing, config.max_fit_error);
+    if (rejectFittedSides(model.side_a, model.side_b, cross_reason)) {
+      model.side_a = dense_a;
+      model.side_b = dense_b;
+    }
+    mark("输出采样");
+    model.valid = true;
+    model.stage = "完成";
+  } catch (const ModelError & error) {
+    model.valid = false;
+    model.stage = error.stage;
+    model.reason = error.reason;
+    model.side_a.samples.clear();
+    model.side_b.samples.clear();
+  }
+  model.elapsed_ms = std::chrono::duration<double, std::milli>(
+    std::chrono::steady_clock::now() - started).count();
+  return model;
+}
+
+
+// 拟合完成后，按弧长查询投影、切线和朝内法线。
+namespace
+{
+
+struct SegmentHit
+{
+  double distance{std::numeric_limits<double>::infinity()};
+  double s{0.0};
+  double gap_s{0.0};
+  Eigen::Vector2d point{Eigen::Vector2d::Zero()};
+  double yaw{0.0};
+};
+
+// 取采样点的平面坐标。
+Eigen::Vector2d positionOf(const RoadSampleData & sample)
+{
+  return Eigen::Vector2d(sample.x, sample.y);
+}
+
+// 把角度折到 [-π, π]。
+double wrapAngle(double angle)
+{
+  constexpr double kPi = 3.14159265358979323846;
+  while (angle > kPi) {
+    angle -= 2.0 * kPi;
+  }
+  while (angle < -kPi) {
+    angle += 2.0 * kPi;
+  }
+  return angle;
+}
+
+// 把点投到一段采样折线上。
+SegmentHit projectOnto(
+  const Eigen::Vector2d & point,
+  const std::vector<RoadSampleData> & samples,
+  double anchor_s,
+  double half_window,
+  double search_radius = -1.0)
+{
+  SegmentHit best;
+  SegmentHit second;
+  if (samples.size() < 2) {
+    return best;
+  }
+  for (size_t i = 0; i + 1 < samples.size(); ++i) {
+    if (half_window >= 0.0) {
+      const double s0 = samples[i].s;
+      const double s1 = samples[i + 1].s;
+      if (s1 < anchor_s - half_window || s0 > anchor_s + half_window) {
+        continue;
+      }
+    }
+    const Eigen::Vector2d start = positionOf(samples[i]);
+    const Eigen::Vector2d end = positionOf(samples[i + 1]);
+    const Eigen::Vector2d edge = end - start;
+    const double length_sq = edge.squaredNorm();
+    double ratio = 0.0;
+    if (length_sq > 1e-16) {
+      ratio = std::clamp((point - start).dot(edge) / length_sq, 0.0, 1.0);
+    }
+    const Eigen::Vector2d foot = start + ratio * edge;
+    const double distance = (point - foot).norm();
+    if (search_radius >= 0.0 && distance > search_radius) {continue;}
+    const double s = samples[i].s + ratio * (samples[i + 1].s - samples[i].s);
+    const double yaw = std::atan2(edge.y(), edge.x());
+    if (distance < best.distance) {
+      second = best;
+      best.distance = distance;
+      best.s = s;
+      best.point = foot;
+      best.yaw = yaw;
+    } else if (distance < second.distance) {
+      second.distance = distance;
+      second.s = s;
+    }
+  }
+  best.gap_s = second.distance < 1e8 ? std::abs(best.s - second.s) : 0.0;
+  if (best.gap_s > 0.0 && second.distance > best.distance + 0.2) {
+    best.gap_s = 0.0;
+  }
+  return best;
+}
+
+}  // namespace
+
+// 保存一份道路模型，供后续查询。
+RoadModelQuery::RoadModelQuery(RoadModelData model)
+: model_(std::move(model))
+{
+}
+
+// 按边号取出对应侧边。
+const SideBoundary & RoadModelQuery::boundaryOf(SideId side) const
+{
+  return side == SideId::A ? model_.side_a : model_.side_b;
+}
+
+// 在两条侧边里找离点最近的投影。
+SideProjection RoadModelQuery::nearestSide(const Eigen::Vector2d & point, double search_radius) const
+{
+  SideProjection result;
+  if (!model_.valid) {
+    result.reason = "道路无效";
+    return result;
+  }
+  const SegmentHit side_a = projectOnto(point, model_.side_a.samples, 0.0, -1.0, search_radius);
+  const SegmentHit side_b = projectOnto(point, model_.side_b.samples, 0.0, -1.0, search_radius);
+  if (!std::isfinite(side_a.distance) && !std::isfinite(side_b.distance)) {
+    result.reason = "侧边无法投影";
+    return result;
+  }
+  const bool choose_a = side_a.distance <= side_b.distance;
+  const SegmentHit & chosen = choose_a ? side_a : side_b;
+  const SegmentHit & other = choose_a ? side_b : side_a;
+  if (std::abs(side_a.distance - side_b.distance) <= 0.05 || chosen.gap_s > 1.0) {
+    result.status = QueryStatus::Ambiguous;
+    result.reason = "近侧边不唯一";
+    return result;
+  }
+  result.status = QueryStatus::Ok;
+  result.side = choose_a ? SideId::A : SideId::B;
+  result.s = chosen.s;
+  result.point = chosen.point;
+  result.distance = chosen.distance;
+  result.yaw = chosen.yaw;
+  (void)other;
+  return result;
+}
+
+// 把点投影到指定侧边。
+SideProjection RoadModelQuery::projectOnSide(
+  SideId side,
+  const Eigen::Vector2d & point,
+  double anchor_s,
+  double half_window) const
+{
+  SideProjection result;
+  result.side = side;
+  if (!model_.valid) {
+    result.reason = "道路无效";
+    return result;
+  }
+  const SegmentHit hit = projectOnto(point, boundaryOf(side).samples, anchor_s, half_window);
+  if (!std::isfinite(hit.distance)) {
+    result.reason = half_window >= 0.0 ? "弧长窗口内没有侧边" : "侧边无法投影";
+    return result;
+  }
+  result.s = hit.s;
+  result.point = hit.point;
+  result.distance = hit.distance;
+  result.yaw = hit.yaw;
+  if (hit.gap_s > 1.0) {
+    result.status = QueryStatus::Ambiguous;
+    result.reason = "同一侧边有多个远隔投影";
+    return result;
+  }
+  result.status = QueryStatus::Ok;
+  return result;
+}
+
+// 按弧长取侧边上的位置和切线。
+SidePose RoadModelQuery::evaluateSide(SideId side, double s) const
+{
+  SidePose pose;
+  const auto & boundary = boundaryOf(side);
+  if (!model_.valid || boundary.samples.size() < 2) {
+    pose.reason = "道路无效";
+    return pose;
+  }
+  const double begin = boundary.samples.front().s;
+  const double end = boundary.samples.back().s;
+  if (s < begin - 1e-6 || s > end + 1e-6) {
+    pose.status = QueryStatus::OutOfRange;
+    pose.reason = "弧长超出侧边";
+    return pose;
+  }
+  int upper = 1;
+  while (upper + 1 < static_cast<int>(boundary.samples.size()) &&
+    boundary.samples[static_cast<size_t>(upper)].s < s)
+  {
+    ++upper;
+  }
+  const auto & left = boundary.samples[static_cast<size_t>(upper - 1)];
+  const auto & right = boundary.samples[static_cast<size_t>(upper)];
+  const double span = right.s - left.s;
+  const double ratio = span < 1e-9 ? 0.0 : std::clamp((s - left.s) / span, 0.0, 1.0);
+  pose.status = QueryStatus::Ok;
+  pose.position = (1.0 - ratio) * positionOf(left) + ratio * positionOf(right);
+  const double yaw = left.yaw + ratio * wrapAngle(right.yaw - left.yaw);
+  pose.yaw = yaw;
+  pose.tangent = Eigen::Vector2d(std::cos(yaw), std::sin(yaw));
+  pose.s = s;
+  pose.corner = left.corner || right.corner || std::abs(wrapAngle(right.yaw - left.yaw)) > 0.5;
+  return pose;
+}
+
+// 取该弧长处朝通道内侧的法线。
+InwardNormal RoadModelQuery::inwardNormal(SideId side, double s) const
+{
+  InwardNormal result;
+  const SidePose pose = evaluateSide(side, s);
+  if (pose.status != QueryStatus::Ok) {
+    result.status = pose.status;
+    result.reason = pose.reason;
+    return result;
+  }
+  if (pose.corner) {
+    result.status = QueryStatus::Ambiguous;
+    result.reason = "拐角处没有唯一法线";
+    return result;
+  }
+  const Eigen::Vector2d left(-pose.tangent.y(), pose.tangent.x());
+  if (left.squaredNorm() < 0.5) {
+    result.reason = "切线退化";
+    return result;
+  }
+  constexpr double kProbe = 0.15;
+  const bool left_inside = pointInsidePolygon(
+    pose.position + kProbe * left, model_.boundary, 0.02);
+  const bool right_inside = pointInsidePolygon(
+    pose.position - kProbe * left, model_.boundary, 0.02);
+  if (left_inside == right_inside) {
+    result.status = QueryStatus::Ambiguous;
+    result.reason = "朝内方向不明确";
+    return result;
+  }
+  result.direction = left_inside ? left : Eigen::Vector2d(-left.x(), -left.y());
+  result.status = QueryStatus::Ok;
+  return result;
+}
+
+// 取该弧长处的通道横截面。
+CrossSection RoadModelQuery::localCrossSection(SideId side, double s) const
+{
+  CrossSection section;
+  const InwardNormal normal = inwardNormal(side, s);
+  const SidePose pose = evaluateSide(side, s);
+  if (normal.status != QueryStatus::Ok || pose.status != QueryStatus::Ok) {
+    section.status = normal.status == QueryStatus::Ok ? pose.status : normal.status;
+    section.reason = normal.status == QueryStatus::Ok ? pose.reason : normal.reason;
+    return section;
+  }
+  std::vector<double> crossings;
+  const auto & polygon = model_.boundary;
+  for (size_t i = 0; i < polygon.size(); ++i) {
+    const Eigen::Vector2d a = polygon[i];
+    const Eigen::Vector2d b = polygon[(i + 1) % polygon.size()];
+    const Eigen::Vector2d edge = b - a;
+    const double det = normal.direction.x() * edge.y() - normal.direction.y() * edge.x();
+    if (std::abs(det) < 1e-12) {
+      continue;
+    }
+    const Eigen::Vector2d delta = a - pose.position;
+    const double distance = (delta.x() * edge.y() - delta.y() * edge.x()) / det;
+    const double ratio = (delta.x() * normal.direction.y() - delta.y() * normal.direction.x()) / det;
+    if (distance >= -0.2 && ratio >= -1e-6 && ratio <= 1.0 + 1e-6) {
+      crossings.push_back(distance);
+    }
+  }
+  std::sort(crossings.begin(), crossings.end());
+  crossings.erase(
+    std::unique(crossings.begin(), crossings.end(), [](double lhs, double rhs) {
+      return std::abs(lhs - rhs) < 1e-5;
+    }),
+    crossings.end());
+  double near_t = 0.0;
+  double far_t = 0.0;
+  bool found = false;
+  for (size_t i = 0; i + 1 < crossings.size(); ++i) {
+    const double t0 = crossings[i];
+    const double t1 = crossings[i + 1];
+    if (t0 > 0.12 || t1 <= t0 + 1e-4) {
+      continue;
+    }
+    const Eigen::Vector2d mid = pose.position + (0.5 * (t0 + t1)) * normal.direction;
+    if (!pointInsidePolygon(mid, polygon, 0.0)) {
+      continue;
+    }
+    if (!found || std::abs(t0) < std::abs(near_t)) {
+      near_t = t0;
+      far_t = t1;
+      found = true;
+    }
+  }
+  if (!found) {
+    section.reason = "没有朝内的有效区间";
+    return section;
+  }
+  const Eigen::Vector2d near = pose.position + near_t * normal.direction;
+  const Eigen::Vector2d far = pose.position + far_t * normal.direction;
+  const auto & this_side = boundaryOf(side).raw;
+  const auto & other_side = boundaryOf(side == SideId::A ? SideId::B : SideId::A).raw;
+  if (distanceToEdges(far, this_side, false) < 0.15) {
+    section.status = QueryStatus::Ambiguous;
+    section.reason = "横截面打到同侧回折";
+    return section;
+  }
+  const double cap_distance = std::min(
+    distanceToEdges(far, model_.start_cap, false),
+    distanceToEdges(far, model_.end_cap, false));
+  const double other_distance = distanceToEdges(far, other_side, false);
+  if (cap_distance + 1e-3 < other_distance && cap_distance < 0.25) {
+    section.status = QueryStatus::Ambiguous;
+    section.reason = "横截面打到端口";
+    return section;
+  }
+  section.status = QueryStatus::Ok;
+  section.s = s;
+  section.width = far_t - near_t;
+  section.near_point = near;
+  section.far_point = far;
+  return section;
+}
+
+}  // namespace garage_road_model

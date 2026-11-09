@@ -16,7 +16,7 @@ struct BoundarySplit
   std::vector<Eigen::Vector2d> side_b;
 };
 
-// 把闭合边界切成两个端头和两条连续侧边。失败时抛出 ModelError，不硬选。
+// 把闭合边界切成两个端口和两条长边。失败时抛出错误，不硬选。
 BoundarySplit splitBoundary(
   const std::vector<Eigen::Vector2d> & boundary,
   const ModelConfig & config);

@@ -156,3 +156,35 @@ TEST(SideSplit, SShapeKeepsTwoSides)
   EXPECT_GT(model.side_a.length, 10.0);
   EXPECT_GT(model.side_b.length, 10.0);
 }
+
+TEST(OutputSampling, FixedDistanceAndEndpoint)
+{
+  ModelConfig config;
+  config.output_sample_spacing = 1.0;
+  auto model = RoadModelBuilder().build({{0,0},{10.3,0},{10.3,3},{0,3}}, 0, config);
+  ASSERT_TRUE(model.valid) << model.reason;
+  for (const auto * side : {&model.side_a, &model.side_b}) {
+    ASSERT_EQ(side->samples.size(), 12u);
+    for (size_t i=0; i<11; ++i) {EXPECT_NEAR(side->samples[i].s, double(i), 1e-8);}
+    EXPECT_NEAR(side->samples.back().s, 10.3, 1e-8);
+  }
+}
+
+TEST(OutputSampling, RejectInvalidSpacing)
+{
+  ModelConfig config;
+  config.output_sample_spacing = 0;
+  auto model = RoadModelBuilder().build({{0,0},{10,0},{10,3},{0,3}}, 0, config);
+  EXPECT_FALSE(model.valid);
+  EXPECT_EQ(model.stage, "输出采样");
+}
+
+TEST(SideQuery, SearchRadiusIsRespected)
+{
+  const auto model = build({{0,0},{10,0},{10,3},{0,3}});
+  ASSERT_TRUE(model.valid);
+  RoadModelQuery query(model);
+  EXPECT_EQ(query.nearestSide({5,0.2}, 0.5).status, QueryStatus::Ok);
+  EXPECT_NE(query.nearestSide({5,0.2}, 0.1).status, QueryStatus::Ok);
+  EXPECT_EQ(query.nearestSide({5,0.2}).status, QueryStatus::Ok);
+}

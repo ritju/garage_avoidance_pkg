@@ -26,12 +26,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 )
 
 add_library(road_model_core SHARED
-  src/polygon_processor.cpp
-  src/boundary_splitter.cpp
-  src/curve_fitter.cpp
-  src/curve_validator.cpp
-  src/road_model_builder.cpp
-  src/road_model_query.cpp
+  src/curve_fit.cpp
 )
 target_include_directories(road_model_core PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

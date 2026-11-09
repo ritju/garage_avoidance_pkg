@@ -27,6 +27,7 @@ struct ModelConfig
   double piece_angle_rad{0.5};
   double resample_spacing{0.2};
   double sample_spacing{0.2};
+  double output_sample_spacing{0.5};
   double max_fit_error{0.08};
   int fit_attempts{5};
   double initial_lambda{1.0};
