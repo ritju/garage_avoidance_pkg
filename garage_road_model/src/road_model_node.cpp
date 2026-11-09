@@ -43,15 +43,12 @@ garage_road_model::msg::SideBoundary toSide(const SideBoundary & side)
   garage_road_model::msg::SideBoundary message;
   message.raw = toPolygon(side.raw);
   message.length = side.length;
-  message.max_error = side.max_error;
-  message.mean_error = side.mean_error;
   for (const auto & sample : side.samples) {
     garage_road_model::msg::RoadSample out;
     out.x = sample.x;
     out.y = sample.y;
     out.yaw = sample.yaw;
     out.s = sample.s;
-    out.curvature = sample.curvature;
     out.corner = sample.corner;
     message.samples.push_back(out);
   }

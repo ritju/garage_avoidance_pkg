@@ -26,6 +26,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 )
 
 add_library(road_model_core SHARED
+  src/geometry.cpp
+  src/polygon_processor.cpp
   src/curve_fit.cpp
 )
 target_include_directories(road_model_core PUBLIC
