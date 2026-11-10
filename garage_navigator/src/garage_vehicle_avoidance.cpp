@@ -4,7 +4,9 @@
 #include <set>
 #include <memory>
 #include <limits>
+#include <cstdlib>
 #include "garage_navigator/garage_vehicle_avoidance.hpp"
+#include "ament_index_cpp/get_package_share_directory.hpp"
 
 namespace garage_utils_pkg
 {
@@ -121,6 +123,28 @@ GarageVehicleAvoidanceNavigator::getDefaultBTFilepath(
 
   node->get_parameter("default_nav_garage_avoidance_bt_xml", default_bt_xml_filename);
 
+  const char * dual_env = std::getenv("GARAGE_ENABLE_DUAL_SIDE_AVOIDANCE");
+  const bool dual_disabled = dual_env != nullptr &&
+    (std::string(dual_env) == "0" || std::string(dual_env) == "false" ||
+    std::string(dual_env) == "False" || std::string(dual_env) == "FALSE");
+  const bool dual_enabled = !dual_disabled;
+  const std::string default_name = "garage_vehicle_avoidance.xml";
+  if (dual_enabled &&
+    default_bt_xml_filename.size() >= default_name.size() &&
+    default_bt_xml_filename.compare(
+      default_bt_xml_filename.size() - default_name.size(),
+      default_name.size(), default_name) == 0)
+  {
+    default_bt_xml_filename =
+      ament_index_cpp::get_package_share_directory("garage_navigator") +
+      "/behavior_trees/garage_vehicle_avoidance_dual_side.xml";
+  }
+
+  RCLCPP_INFO(
+    node->get_logger(),
+    "GARAGE_ENABLE_DUAL_SIDE_AVOIDANCE=%s xml=%s clear=3 busy=4 max_wait=15 suppress=5",
+    dual_enabled ? "true" : "false", default_bt_xml_filename.c_str());
+
   return default_bt_xml_filename;
 }
 
@@ -157,6 +181,23 @@ GarageVehicleAvoidanceNavigator::goalReceived(ActionT::Goal::ConstSharedPtr goal
   
 
   initializeGoalPose(goal);
+
+  auto blackboard = bt_action_server_->getBlackboard();
+  geometry_msgs::msg::PoseStamped empty_pose;
+  blackboard->set<bool>("allow_far", true);
+  blackboard->set<bool>("right_edge_active", false);
+  blackboard->set<bool>("far_pending", false);
+  blackboard->set<bool>("approved_ready", false);
+  blackboard->set<bool>("far_give_up", false);
+  blackboard->set<double>("far_wait_start", 0.0);
+  blackboard->set<double>("suppress_until", 0.0);
+  blackboard->set<bool>("tracking_armed", false);
+  blackboard->set<double>("far_clear_since", 0.0);
+  blackboard->set<double>("find_goal_sent", 0.0);
+  blackboard->set<uint8_t>("point_side", static_cast<uint8_t>(0));
+  blackboard->set<geometry_msgs::msg::PoseStamped>("candidate_point", empty_pose);
+  blackboard->set<geometry_msgs::msg::PoseStamped>("saved_candidate", empty_pose);
+  blackboard->set<geometry_msgs::msg::PoseStamped>("approved_point", empty_pose);
 
   return true;
 }

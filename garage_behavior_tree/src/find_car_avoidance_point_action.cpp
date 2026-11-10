@@ -33,6 +33,11 @@ void FindCarAvoidancePointAction::on_tick()
   getInput("polygons", goal_.polygons);
   getInput("car_pose", goal_.car_pose);
   getInput("car_size", goal_.car_size);
+  bool enable_far_side = false;
+  getInput("enable_far_side", enable_far_side);
+  goal_.enable_far_side = enable_far_side;
+  // 远侧确认只认在“连续无车”之后才发出的找点。
+  config().blackboard->set("find_goal_sent", node_->now().seconds());
   // RCLCPP_INFO(node_->get_logger(), "car_size: (%f, %f, %f)", goal_.car_size.x, goal_.car_size.y, goal_.car_size.z);
   // RCLCPP_INFO(node_->get_logger(), "on tick set state %d", garage_utils_msgs::msg::State::GENERATE_PATH);
   setOutput("state", garage_utils_msgs::msg::State::SEARCHING_PARKING_SPACE);
@@ -75,8 +80,35 @@ void FindCarAvoidancePointAction::on_tick()
 
 BT::NodeStatus FindCarAvoidancePointAction::on_success()
 {
-  setOutput("free_point", result_.result->pose);
-  setOutput("goal", result_.result->pose);
+  const auto pose = result_.result->pose;
+  const uint8_t side = result_.result->side;
+  bool enable_far_side = false;
+  getInput("enable_far_side", enable_far_side);
+
+  if (!enable_far_side && side == 2) {
+    RCLCPP_INFO(node_->get_logger(), "远侧结果在屏蔽期内，丢弃");
+    return BT::NodeStatus::FAILURE;
+  }
+
+  RCLCPP_INFO(node_->get_logger(), "找点返回 side=%u (%.2f, %.2f) enable_far_side=%d",
+    side, pose.pose.position.x, pose.pose.position.y, enable_far_side);
+  setOutput("free_point", pose);
+  setOutput("goal", pose);
+  setOutput("candidate_point", pose);
+  setOutput("point_side", side);
+  config().blackboard->set("saved_candidate", pose);
+  config().blackboard->set("point_side", side);
+
+  if (side == 2) {
+    config().blackboard->set("far_pending", true);
+    double far_wait_start = 0.0;
+    config().blackboard->get("far_wait_start", far_wait_start);
+    if (far_wait_start <= 0.0) {
+      config().blackboard->set("far_wait_start", node_->now().seconds());
+      RCLCPP_INFO(node_->get_logger(), "记下远侧等待起点");
+    }
+  }
+
   return BT::NodeStatus::SUCCESS;
 }
 
@@ -85,6 +117,8 @@ BT::NodeStatus FindCarAvoidancePointAction::on_aborted()
   geometry_msgs::msg::PoseStamped empty_pose;
   setOutput("free_point", empty_pose);
   setOutput("goal", empty_pose);
+  setOutput("candidate_point", empty_pose);
+  setOutput("point_side", static_cast<uint8_t>(0));
   return BT::NodeStatus::FAILURE;
 }
 
@@ -93,6 +127,8 @@ BT::NodeStatus FindCarAvoidancePointAction::on_cancelled()
   geometry_msgs::msg::PoseStamped empty_pose;
   setOutput("free_point", empty_pose);
   setOutput("goal", empty_pose);
+  setOutput("candidate_point", empty_pose);
+  setOutput("point_side", static_cast<uint8_t>(0));
   return BT::NodeStatus::SUCCESS;
 }
 

@@ -69,6 +69,12 @@ list(APPEND plugin_libs is_car_moving)
 add_library(wait_for_cars_gone SHARED src/wait_for_cars_gone.cpp)
 list(APPEND plugin_libs wait_for_cars_gone)
 
+add_library(wait_for_far_side SHARED src/wait_for_far_side.cpp)
+list(APPEND plugin_libs wait_for_far_side)
+
+add_library(far_side_guard SHARED src/far_side_guard.cpp)
+list(APPEND plugin_libs far_side_guard)
+
 foreach(bt_plugin ${plugin_libs})
   ament_target_dependencies(${bt_plugin} ${dependencies})
   target_compile_definitions(${bt_plugin} PRIVATE BT_PLUGIN_EXPORT)
