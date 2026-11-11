@@ -12,6 +12,7 @@ find_package(rclcpp_action REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(garage_utils_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(nav2_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2 REQUIRED)
@@ -24,6 +25,7 @@ set(dependencies
   rclcpp_components
   garage_utils_msgs
   nav_msgs
+  nav2_msgs
   geometry_msgs
   tf2_geometry_msgs
   tf2
@@ -54,7 +56,7 @@ target_include_directories(shortest_path_search PUBLIC
 ament_target_dependencies(shortest_path_search ${dependencies})
 
 add_library(generate_path SHARED
-  src/generate_path.cpp)
+  src/generate_path.cpp src/footprint_check.cpp)
 target_include_directories(generate_path PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)

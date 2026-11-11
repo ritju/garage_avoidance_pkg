@@ -2,6 +2,9 @@
 #define GARAGE_UTILS__COMPUTE_RIGHT_EDGE_PATH_HPP_
 
 #include <functional>
+#include <mutex>
+#include "geometry_msgs/msg/polygon_stamped.hpp"
+#include "nav2_msgs/msg/costmap.hpp"
 #include <memory>
 #include <thread>
 #include <cmath>
@@ -204,9 +207,15 @@ private:
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   tf2::Transform map_robot_tf;
 
-  GenerateModel * model_generator_;
-  ShortestPathSearch * path_searcher_;
-  GeneratePath * path_generator_;
+  GenerateModel * model_generator_{nullptr};
+  ShortestPathSearch * path_searcher_{nullptr};
+  GeneratePath * path_generator_{nullptr};
+  std::mutex execution_mutex_;
+  std::mutex map_mutex_;
+  nav2_msgs::msg::Costmap::ConstSharedPtr costmap_;
+  geometry_msgs::msg::PolygonStamped::ConstSharedPtr footprint_;
+  rclcpp::Subscription<nav2_msgs::msg::Costmap>::SharedPtr costmap_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::PolygonStamped>::SharedPtr footprint_sub_;
 
   std::vector<EnhancedRect> rects_origin;
   std::vector<EnhancedRect> rects_ordered;

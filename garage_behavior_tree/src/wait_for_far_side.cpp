@@ -64,8 +64,6 @@ void WaitForFarSide::resetState()
   started_ = false;
   clear_acc_ = 0.0;
   busy_acc_ = 0.0;
-  clear_since_ = 0.0;
-  config().blackboard->set("far_clear_since", 0.0);
 }
 
 BT::NodeStatus WaitForFarSide::tick()
@@ -86,7 +84,6 @@ BT::NodeStatus WaitForFarSide::tick()
     last_tick_time_ = now;
     clear_acc_ = 0.0;
     busy_acc_ = 0.0;
-    clear_since_ = 0.0;
     RCLCPP_INFO(node_->get_logger(), "开始远侧等待");
   }
 
@@ -103,16 +100,6 @@ BT::NodeStatus WaitForFarSide::tick()
       clear_acc_ += dt;
     }
   }
-
-  if (fresh && !has_car && clear_acc_ >= clear_sec_) {
-    if (clear_since_ <= 0.0) {
-      clear_since_ = now.seconds();
-      RCLCPP_INFO(node_->get_logger(), "连续 %.1f 秒没有动态车，等下一次找点确认远侧点", clear_sec_);
-    }
-  } else {
-    clear_since_ = 0.0;
-  }
-  config().blackboard->set("far_clear_since", clear_since_);
 
   if ((now - last_log_time_).seconds() >= 1.0) {
     last_log_time_ = now;
@@ -132,7 +119,12 @@ BT::NodeStatus WaitForFarSide::tick()
     RCLCPP_WARN(node_->get_logger(), "远侧等待达到 %.1f 秒", max_wait_);
     return giveUp();
   }
-  return BT::NodeStatus::SUCCESS;
+  if (fresh && !has_car && clear_acc_ >= clear_sec_) {
+    RCLCPP_INFO(node_->get_logger(),
+      "连续 %.1f 秒没有动态车，直接使用已保存的远侧点", clear_sec_);
+    return BT::NodeStatus::SUCCESS;
+  }
+  return BT::NodeStatus::RUNNING;
 }
 
 void WaitForFarSide::halt()

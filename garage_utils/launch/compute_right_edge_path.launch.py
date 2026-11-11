@@ -40,17 +40,21 @@ def generate_launch_description():
     log_level_arg = DeclareLaunchArgument('log_level', default_value='info', description='define compute_right_edge_path_action_server node log level')
 
     # 获取环境变量值
-    off_set = get_environment_value("COMPUTE_RIGHT_EDGE_PATH_OFFSET", "0.8")
     resolution = get_environment_value("COMPUTE_RIGHT_EDGE_PATH_RESOLUTION", "1.0")
     allow_inverse = get_environment_value("COMPUTE_RIGHT_EDGE_PATH_ALLOW_INVERSE", "False")
 
     # 参数替换配置 - 确保值为字符串类型
     param_substitutions = {
-        "offset": str(off_set),
         "resolution": str(resolution),
         "allow_inverse": str(allow_inverse).lower(),
     }    
     
+    # 偏移默认值使用 YAML，只有显式设置的环境变量才覆盖。
+    for parameter in ("offset_min", "offset_max", "offset_step"):
+        env_name = "COMPUTE_RIGHT_EDGE_PATH_" + parameter.upper()
+        if env_name in os.environ:
+            param_substitutions[parameter] = os.environ[env_name]
+
     # 配置参数文件
     configured_params = RewrittenYaml(
         source_file=params_file_path,

@@ -11,8 +11,9 @@
 namespace garage_utils_pkg
 {
 
-// 远侧等待的看门节点，每个 tick 都要被执行：
-//   SUCCESS  还可以继续等；连续无车满 clear_sec 时把 far_clear_since 写到黑板
+// 等待已保存远侧点的车辆放行条件：
+//   RUNNING  继续等待
+//   SUCCESS  连续无车满 clear_sec，允许使用已保存的远侧点
 //   FAILURE  连续有车满 busy_sec 或从 far_wait_start 起满 max_wait，放弃远侧
 class WaitForFarSide : public BT::ActionNodeBase
 {
@@ -63,7 +64,6 @@ private:
   rclcpp::Time last_log_time_;
   double clear_acc_ = 0.0;
   double busy_acc_ = 0.0;
-  double clear_since_ = 0.0;
 };
 
 }  // namespace garage_utils_pkg

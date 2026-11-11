@@ -122,7 +122,33 @@ int main(int argc, char**argv)
                }
 
                auto path_generator = new garage_utils_pkg::GeneratePath(node);
-               path_generator->process_(points_ordered, polygons, false);
+               // Standalone geometry demo: use a free test map and a sample footprint.
+               nav2_msgs::msg::Costmap map;
+               map.header.frame_id = "map";
+               map.metadata.resolution = 0.1;
+               map.metadata.size_x = 1000;
+               map.metadata.size_y = 1000;
+               map.metadata.origin.position.x = -50.0;
+               map.metadata.origin.position.y = -50.0;
+               map.metadata.origin.orientation.w = 1.0;
+               map.data.assign(1000 * 1000, 0);
+               geometry_msgs::msg::Polygon footprint;
+               for (const auto & xy : std::vector<std::pair<float, float>>{
+                   {-0.925f, -0.660f}, {0.925f, -0.660f},
+                   {0.925f, 0.660f}, {-0.925f, 0.660f}})
+               {
+                   geometry_msgs::msg::Point32 point;
+                   point.x = xy.first;
+                   point.y = xy.second;
+                   footprint.points.push_back(point);
+               }
+               garage_utils_pkg::FootprintCheck checker(map, footprint);
+               geometry_msgs::msg::Pose robot;
+               robot.position.x = robot_x;
+               robot.position.y = robot_y;
+               robot.orientation.w = 1.0;
+               garage_utils_pkg::PathSearchReport report;
+               path_generator->process_(points_ordered, polygons, false, robot, checker, report);
                auto path = path_generator->get_path();
                auto path_pub = node->create_publisher<nav_msgs::msg::Path>("garage_path", rclcpp::QoS(1).reliable());
                

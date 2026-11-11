@@ -7,33 +7,12 @@
         <WaitForCarsGone idle_timeout="15" max_wait="60"/>
       </Sequence>
 
-      <!-- WaitForFarSide 每个 tick 都执行：有车满 4 秒或等满 15 秒返回 FAILURE，
-           PipelineSequence 随即停掉正在跑的找点。找点按 1 Hz 一直重复，
-           远侧点只有在“连续 3 秒无车之后才发出”的那次找点返回时才批准。 -->
+      <!-- 保存首次找到的远侧点，只等待车辆条件；放行后直接使用该点。 -->
       <Sequence name="WaitForFarSideClear">
         <FarSideGuard command="has_far_pending"/>
-        <PipelineSequence>
-          <WaitForFarSide clear_sec="3" busy_sec="4" max_wait="15" stale_sec="1.0" topic_name="/car_information_all"/>
-          <RateController hz="1.0">
-            <ForceSuccess>
-              <Sequence>
-                <FindCarAvoidancePoint polygons="{polygons}" car_pose="{car_pose}" car_size="{car_size}" enable_far_side="true" free_point="{free_point}" goal="{goal}" candidate_point="{candidate_point}" point_side="{point_side}" state="{state}"/>
-                <Fallback>
-                  <Sequence>
-                    <FarSideGuard command="is_near_or_external"/>
-                    <FarSideGuard command="approve"/>
-                  </Sequence>
-                  <Sequence>
-                    <FarSideGuard command="is_far"/>
-                    <FarSideGuard command="confirm_far"/>
-                    <FarSideGuard command="approve"/>
-                  </Sequence>
-                </Fallback>
-              </Sequence>
-            </ForceSuccess>
-          </RateController>
-          <FarSideGuard command="yield"/>
-        </PipelineSequence>
+        <WaitForFarSide clear_sec="3" busy_sec="4" max_wait="15" stale_sec="1.0" topic_name="/car_information_all"/>
+        <FarSideGuard command="approve"/>
+        <FarSideGuard command="yield"/>
       </Sequence>
 
       <Sequence name="InitialSearch">

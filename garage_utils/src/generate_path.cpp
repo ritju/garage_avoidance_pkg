@@ -1,4 +1,5 @@
 #include "garage_utils/generate_path.hpp"
+#include <stdexcept>
 
 namespace garage_utils_pkg
 {
@@ -14,91 +15,95 @@ namespace garage_utils_pkg
              RCLCPP_INFO(node_->get_logger(), " [generate_path] GeneratePath destructor.");   
         }
 
-        void GeneratePath::process_(const std::vector<EnhancedPoint>& points, const std::vector<geometry_msgs::msg::Polygon>& polygons, bool path_inverse)
+        void GeneratePath::process_(const std::vector<EnhancedPoint>& points,
+            const std::vector<geometry_msgs::msg::Polygon>& polygons, bool path_inverse,
+            const geometry_msgs::msg::Pose & robot, const FootprintCheck & checker,
+            PathSearchReport & report)
         {
-              RCLCPP_INFO(node_->get_logger(), " [generate_path] Begin to generating path..."); 
-              this->path_.header.frame_id = "map";
-              this->path_.poses.clear();
-               
-               this->points_ = points;
-               this->polygons_ = polygons;
-
-        //        std::vector<nav_msgs::msg::Path> path_all;
-               std::vector<std::pair<Point, Point>> path_all;
-               nav_msgs::msg::Path path_one;
-
-               for (size_t i = 0; i < points.size() - 1; i++)
-               {
-                    RCLCPP_INFO(node_->get_logger(), " [generate_path] ");
-                    RCLCPP_INFO(node_->get_logger(), " [generate_path] segment %zd->%zd", i, i+1);
-                    auto pt1 = points[i];
-                    auto pt2 = points[i + 1];
-                    int index = find_polygon_index(pt1, pt2, polygons);
-                    auto path_of_one_segment = generate_path_for_one_segment2(pt1, pt2, polygons[index]);
-                    
-                    path_all.push_back(path_of_one_segment);
-               }
-
-               optimize_neighbored_path(path_all);
-               this->path_.poses.clear();
-
-               for (size_t i = 0; i < path_all.size(); i++)
-               {
-                        auto one_path = path_all[i];
-                        auto path_start = one_path.first;
-                        auto path_end = one_path.second;
-                        // RCLCPP_INFO(node_->get_logger(), " [generate_path] path_end => (%f, %f)", path_end.first, path_end.second);
-
-                        double dx, dy;
-                        dx = path_end.first - path_start.first;
-                        dy = path_end.second - path_start.second;
-                        double length = std::sqrt(dx*dx + dy*dy);
-                        double unit_x = dx / length;  
-                        double unit_y = dy / length;   
-
-                        nav_msgs::msg::Path path;
-                        double distance_add = 0.0;
-                        Point pt = path_start;
-
-                              RCLCPP_INFO(node_->get_logger(), " [generate_path] ***** path *****");
-                        while (distance_add <= length)
-                        {
-                                geometry_msgs::msg::PoseStamped pose;
-                                pose.header.frame_id = "map";
-                                double x,y;
-                                x = pt.first;
-                                y = pt.second;
-                                pose.pose.position.x = x;
-                                pose.pose.position.y = y;
-                                path.poses.push_back(pose);
-                                RCLCPP_INFO(node_->get_logger(), " [generate_path] pose: (%f, %f)", x, y);
-
-                                pt.first +=  unit_x * this->resolution_;
-                                pt.second += unit_y * this->resolution_; 
-                                distance_add += this->resolution_;  
-                                // RCLCPP_INFO(node_->get_logger(), " [generate_path] length: %f, distance_add: %f", length, distance_add);        
-                        }
-
-                        // 添加end端点作为path终点
-                        geometry_msgs::msg::PoseStamped pose_end;
-                        pose_end.header.frame_id = "map";
-                        pose_end.pose.position.x = path_end.first;
-                        pose_end.pose.position.y = path_end.second;
-                        path.poses.push_back(pose_end);
-                        RCLCPP_INFO(node_->get_logger(), " [generate_path] end => x: %f, y: %f", path_end.first, path_end.second);
-                        this->path_.poses.insert(this->path_.poses.end(), path.poses.begin(), path.poses.end());
-               }
-               size_t size_before_filter = this->path_.poses.size();
-               filter_for_path(this->path_);
-               size_t size_after_filter = this->path_.poses.size();
-               RCLCPP_INFO(node_->get_logger(), "delete %ld pose(s).", size_before_filter - size_after_filter);
-               add_orientation_for_path(this->path_, path_inverse);
-               
-        //        for (size_t i = 0; i < path_all.size(); i++)
-        //        {
-        //             this->path_.poses.reserve(this->path_.poses.size() + path_all[i].poses.size());
-        //             this->path_.poses.insert(this->path_.poses.end(), path_all[i].poses.begin(), path_all[i].poses.end());
-        //        }
+            path_.header.frame_id = "map";
+            path_.poses.clear();
+            report = PathSearchReport{};
+            init_params();
+            if (points.size() < 2) {throw std::runtime_error("没有可生成路径的通道段");}
+            std::vector<std::pair<Point, Point>> lines;
+            std::vector<Point> normals;
+            for (size_t i = 0; i+1 < points.size(); ++i) {
+                if (std::hypot(points[i+1].coord.first-points[i].coord.first,
+                    points[i+1].coord.second-points[i].coord.second) < 1e-8) {continue;}
+                const int index = find_polygon_index(points[i], points[i+1], polygons);
+                const auto line = generate_path_for_one_segment2(points[i], points[i+1], polygons[index]);
+                const double dx = line.second.first-line.first.first;
+                const double dy = line.second.second-line.first.second;
+                const double length = std::hypot(dx, dy);
+                if (length < 1e-8) {throw std::runtime_error("通道投影线段长度为零");}
+                lines.push_back(line);
+                normals.emplace_back(-dy/length, dx/length);
+            }
+            optimize_neighbored_path(lines);
+            nav_msgs::msg::Path reference;
+            std::vector<Point> point_normals;
+            for (size_t i = 0; i < lines.size(); ++i) {
+                const auto & line = lines[i];
+                const double dx = line.second.first-line.first.first;
+                const double dy = line.second.second-line.first.second;
+                const double length = std::hypot(dx, dy);
+                if (length < 1e-8) {continue;}
+                for (double distance = 0; ; distance = std::min(length, distance+resolution_)) {
+                    geometry_msgs::msg::PoseStamped pose;
+                    pose.header.frame_id = "map";
+                    pose.pose.position.x = line.first.first+dx*distance/length;
+                    pose.pose.position.y = line.first.second+dy*distance/length;
+                    if (reference.poses.empty() || std::hypot(
+                        pose.pose.position.x-reference.poses.back().pose.position.x,
+                        pose.pose.position.y-reference.poses.back().pose.position.y) > 1e-8)
+                    {
+                        reference.poses.push_back(pose);
+                        point_normals.push_back(normals[i]);
+                    }
+                    if (distance >= length) {break;}
+                }
+            }
+            add_orientation_for_path(reference, path_inverse);
+            report.planned = reference.poses.size();
+            if (report.planned < 2) {throw std::runtime_error("参考路径不足两个点");}
+            auto previous = robot;
+            bool moved = false;
+            for (size_t i = 0; i < reference.poses.size(); ++i) {
+                ++report.checked;
+                bool found = false;
+                for (double offset = offset_; ; offset = std::min(offset_max_, offset+offset_step_)) {
+                    ++report.attempts;
+                    auto candidate = reference.poses[i];
+                    candidate.pose.position.x += (offset-offset_)*point_normals[i].first;
+                    candidate.pose.position.y += (offset-offset_)*point_normals[i].second;
+                    std::string why;
+                    if (checker.motionFree(previous, candidate.pose, why)) {
+                        moved = moved || std::hypot(candidate.pose.position.x-robot.position.x,
+                            candidate.pose.position.y-robot.position.y) > 1e-6;
+                        path_.poses.push_back(candidate);
+                        previous = candidate.pose;
+                        found = true;
+                        break;
+                    }
+                    report.reason = "连接段" + why;
+                    std::string point_reason;
+                    if (!checker.motionFree(candidate.pose, candidate.pose, point_reason)) {
+                        report.reason = "候选点" + point_reason;
+                    }
+                    if (offset >= offset_max_) {break;}
+                }
+                if (!found) {
+                    report.interrupted = i+1;
+                    report.x = reference.poses[i].pose.position.x;
+                    report.y = reference.poses[i].pose.position.y;
+                    break;
+                }
+                report.reason.clear();
+            }
+            if (!moved) {
+                path_.poses.clear();
+                throw std::runtime_error("没有能实际前进的路径；" + report.reason);
+            }
         }
 
         void GeneratePath::filter_for_path(nav_msgs::msg::Path &path)
@@ -156,7 +161,7 @@ namespace garage_utils_pkg
 
         void GeneratePath::optimize_neighbored_path(std::vector<std::pair<Point, Point>>& path_all)
         {
-                for (size_t i = 0; i < path_all.size() - 1; i++)
+                for (size_t i = 0; i+1 < path_all.size(); i++)
                 {
                         auto &line1 = path_all[i];
                         auto &line2 = path_all[i+1];
@@ -348,7 +353,7 @@ namespace garage_utils_pkg
                 ss << "can not find pt1(" << pt1.coord.first << ", " << pt1.coord.second << ")"
                         << "and pt2("     << pt2.coord.first << ", " << pt2.coord.second << ")"
                         << " in polygons";
-                throw ss.str().c_str();
+                throw std::runtime_error(ss.str());
         }
 
         void GeneratePath::sortVertices(EnhancedRect& rect)
@@ -473,8 +478,14 @@ namespace garage_utils_pkg
 
         void GeneratePath::init_params()
         {
-                this->offset_ = this->node_->get_parameter_or<double>("offset", 0.8);
+                this->offset_ = this->node_->get_parameter_or<double>("offset_min", 0.7);
                 this->resolution_ = this->node_->get_parameter_or<double>("resolution", 1.0);
+                offset_max_ = node_->get_parameter_or<double>("offset_max", 4.0);
+                offset_step_ = node_->get_parameter_or<double>("offset_step", 0.5);
+                if (!std::isfinite(offset_) || !std::isfinite(offset_max_) ||
+                    !std::isfinite(offset_step_) || !std::isfinite(resolution_) ||
+                    offset_ < 0 || offset_max_ < offset_ || offset_step_ <= 0 || resolution_ <= 0)
+                {throw std::runtime_error("偏移参数或路径分辨率无效");}
         }
 
         std::vector<std::pair<double, double>> GeneratePath::offset(double dis, std::pair<double, double> pt1, std::pair<double, double> pt2) 
@@ -484,7 +495,11 @@ namespace garage_utils_pkg
                 double dy = pt2.second - pt1.second;
                 
                 // 计算左方向的单位法向量（逆时针旋转90度）
-                double length = std::sqrt(dx*dx + dy*dy);
+                const double length = std::hypot(dx, dy);
+                if (!std::isfinite(length) || length < 1e-8)
+                {
+                        throw std::runtime_error("通道投影线段退化，无法计算偏移方向");
+                }
                 double unit_x = -dy / length;  // 左方向x分量‌
                 double unit_y = dx / length;   // 左方向y分量‌
                 
