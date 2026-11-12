@@ -10,7 +10,7 @@
       <!-- 保存首次找到的远侧点，只等待车辆条件；放行后直接使用该点。 -->
       <Sequence name="WaitForFarSideClear">
         <FarSideGuard command="has_far_pending"/>
-        <WaitForFarSide clear_sec="3" busy_sec="4" max_wait="15" stale_sec="1.0" topic_name="/car_information_all"/>
+        <WaitForFarSide clear_sec="3" busy_sec="10" max_wait="15" stale_sec="1.0" topic_name="/car_information_all"/>
         <FarSideGuard command="approve"/>
         <FarSideGuard command="yield"/>
       </Sequence>
@@ -96,8 +96,8 @@
             </Sequence>
           </RecoveryNode>
         </RunOnce>
-        <!-- 5 秒远侧屏蔽从开始跟踪靠右路径起算，同一次靠右只记一次。 -->
-        <FarSideGuard command="arm_tracking" suppress_sec="5"/>
+        <!-- 1 秒远侧屏蔽从开始跟踪靠右路径起算，同一次靠右只记一次。 -->
+        <FarSideGuard command="arm_tracking" suppress_sec="1"/>
         <RecoveryNode number_of_retries="2" name="FollowPath">
           <FollowPath path="{path}" controller_id="FollowPath"/>
           <Sequence>
