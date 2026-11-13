@@ -34,7 +34,7 @@ public:
       BT::InputPort<double>("busy_sec", 4.0, "连续多少秒有动态车则改靠右"),
       BT::InputPort<double>("max_wait", 15.0, "从 far_wait_start 起的最长等待"),
       BT::InputPort<double>("stale_sec", 1.0, "超过这么久没有新消息则暂停 3 秒和 4 秒计时"),
-      BT::InputPort<std::string>("topic_name", "/car_information_all", "动态车话题"),
+      BT::InputPort<std::string>("topic_name", "/car_information", "动态车话题"),
     };
   }
 
@@ -54,7 +54,7 @@ private:
   double busy_sec_ = 4.0;
   double max_wait_ = 15.0;
   double stale_sec_ = 1.0;
-  std::string topic_name_ = "/car_information_all";
+  std::string topic_name_ = "/car_information";
 
   bool started_ = false;
   bool ever_received_ = false;

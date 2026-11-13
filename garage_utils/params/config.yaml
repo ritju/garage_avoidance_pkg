@@ -6,7 +6,7 @@ compute_right_edge_path_action_server:
     robot_x_test: -1.0
     robot_y_test: 21.5
     strict_mode: true    #删除距离车子更近的危险路径
-    offset_min: 0.7      #底盘参考点距右侧边的最小偏移，米
+    offset_min: 1.0      #底盘参考点距右侧边的最小偏移，米
     offset_max: 4.0      #最大偏移，米
     offset_step: 0.5     #横向每次尝试增加的距离，米
     resolution: 1.0      #path中点与点之间的距离，单位米

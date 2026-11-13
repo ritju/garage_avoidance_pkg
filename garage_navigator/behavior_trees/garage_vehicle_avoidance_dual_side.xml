@@ -4,13 +4,14 @@
       <Sequence name="ParkApprovedPoint">
         <FarSideGuard command="has_approved"/>
         <WeltModelNode goal_pose="{approved_point}" state="{state}"/>
-        <WaitForCarsGone idle_timeout="15" max_wait="60"/>
+        <WaitForCarsGone idle_timeout="15" max_wait="60" topic_name="/car_information"/>
       </Sequence>
 
       <!-- 保存首次找到的远侧点，只等待车辆条件；放行后直接使用该点。 -->
       <Sequence name="WaitForFarSideClear">
         <FarSideGuard command="has_far_pending"/>
-        <WaitForFarSide clear_sec="3" busy_sec="10" max_wait="15" stale_sec="1.0" topic_name="/car_information_all"/>
+        <!-- 暂注释远侧动态车等待：找到远侧点后直接批准，不再等 /car_information -->
+        <!-- <WaitForFarSide clear_sec="1" busy_sec="10" max_wait="15" stale_sec="1.0" topic_name="/car_information"/> -->
         <FarSideGuard command="approve"/>
         <FarSideGuard command="yield"/>
       </Sequence>
