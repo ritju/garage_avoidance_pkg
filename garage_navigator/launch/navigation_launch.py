@@ -101,7 +101,10 @@ def generate_launch_description():
                 respawn=use_respawn,
                 respawn_delay=2.0,
                 parameters=[configured_params],
-                arguments=['--ros-args', '--log-level', log_level],
+                # 不带节点名前缀的参数同样作用于 BtActionServer 在进程内创建的节点。
+                # Humble 的参数复制不会覆盖内部节点已经声明的 use_sim_time 默认值。
+                arguments=['--ros-args', '--log-level', log_level,
+                           '-p', ['use_sim_time:=', use_sim_time]],
                 remappings=remappings),
             Node(
                 package='nav2_lifecycle_manager',

@@ -129,7 +129,7 @@ BT::NodeStatus FindCarAvoidancePointAction::on_cancelled()
   setOutput("goal", empty_pose);
   setOutput("candidate_point", empty_pose);
   setOutput("point_side", static_cast<uint8_t>(0));
-  return BT::NodeStatus::SUCCESS;
+  return BT::NodeStatus::FAILURE;
 }
 
 void FindCarAvoidancePointAction::halt()

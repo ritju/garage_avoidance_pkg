@@ -118,7 +118,7 @@ GarageVehicleAvoidanceNavigator::getDefaultBTFilepath(
     node->declare_parameter<std::string>(
       "default_nav_garage_avoidance_bt_xml",
       pkg_share_dir +
-      "/behavior_trees/garage.xml");
+      "/behavior_trees/garage_vehicle_avoidance.xml");
   }
 
   node->get_parameter("default_nav_garage_avoidance_bt_xml", default_bt_xml_filename);
@@ -142,7 +142,7 @@ GarageVehicleAvoidanceNavigator::getDefaultBTFilepath(
 
   RCLCPP_INFO(
     node->get_logger(),
-    "GARAGE_ENABLE_DUAL_SIDE_AVOIDANCE=%s xml=%s clear=3 busy=4 max_wait=15 suppress=5",
+    "GARAGE_ENABLE_DUAL_SIDE_AVOIDANCE=%s xml=%s，计时参数以 XML 端口为准",
     dual_enabled ? "true" : "false", default_bt_xml_filename.c_str());
 
   return default_bt_xml_filename;
