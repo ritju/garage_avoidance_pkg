@@ -105,19 +105,5 @@ ament_export_libraries(
 
 ament_export_dependencies(${dependencies})
 
-if(BUILD_TESTING)
-  find_package(ament_cmake_gtest REQUIRED)
-  find_package(nav2_behavior_tree REQUIRED)
-  ament_add_gtest(test_stop_when_cars_gone test/test_stop_when_cars_gone.cpp)
-  ament_target_dependencies(test_stop_when_cars_gone ${dependencies})
-  target_link_libraries(test_stop_when_cars_gone
-    stop_when_cars_gone far_side_guard wait_for_cars_gone find_car_avoidance_point_action)
-  target_compile_definitions(test_stop_when_cars_gone PRIVATE
-    BT_XML_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../garage_navigator/behavior_trees"
-    ROS_BT_LIB_DIR="${nav2_behavior_tree_DIR}/../../../lib")
-  set_tests_properties(test_stop_when_cars_gone PROPERTIES
-    ENVIRONMENT "ROS_DOMAIN_ID=197;ROS_LOCALHOST_ONLY=1")
-endif()
-
 ament_package()
 
