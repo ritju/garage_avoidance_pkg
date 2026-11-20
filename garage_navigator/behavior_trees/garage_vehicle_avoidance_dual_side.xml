@@ -10,7 +10,7 @@
       <!-- 保留当前策略：远侧候选直接批准；动态车等待暂未启用。 -->
       <Sequence name="WaitForFarSideClear">
         <FarSideGuard command="has_far_pending"/>
-        <WaitForFarSide clear_sec="1" busy_sec="10" max_wait="15" stale_sec="1.0" topic_name="/car_information"/>
+        <WaitForFarSide clear_sec="3" busy_sec="10" max_wait="15" stale_sec="1.0" topic_name="/car_information"/>
         <FarSideGuard command="approve"/>
         <FarSideGuard command="yield"/>
       </Sequence>
