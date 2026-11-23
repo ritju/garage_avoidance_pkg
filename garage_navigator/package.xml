@@ -8,6 +8,7 @@
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>ament_index_cpp</depend>
   <build_depend>garage_behavior_tree</build_depend>
  
   <depend>behaviortree_cpp_v3</depend>

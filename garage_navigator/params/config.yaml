@@ -1,14 +1,15 @@
 bt_garage_navigator:
   ros__parameters:
     default_server_timeout: 50000
-    use_sim: false
-    # default_nav_garage_avoidance_bt_xml: /workspaces/capella_ros_docker/install/share/garage_navigator/behavior_trees/garage_vehicle_avoidance.xml
-    default_nav_garage_avoidance_bt_xml: /capella/share/capella_ros_launcher/behavior_trees/garage_vehicle_avoidance.xml 
+    use_sim_time: false
     plugin_lib_names:
       - compute_right_edge_path_action
       - find_car_avoidance_point_action
       - welt_model_node
       - wait_for_cars_gone
+      - stop_when_cars_gone
+      - wait_for_far_side
+      - far_side_guard
       - nav2_compute_path_to_pose_action_bt_node
       - nav2_compute_path_through_poses_action_bt_node
       - nav2_smooth_path_action_bt_node

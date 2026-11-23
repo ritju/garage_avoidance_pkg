@@ -52,6 +52,7 @@ BT::NodeStatus WaitForCarsGone::tick()
     if ((now - last_car_time_).seconds() >= idle_timeout_) {
       RCLCPP_INFO(node_->get_logger(),
         "连续 %.1f 秒没有检测到车，避车等待结束", idle_timeout_);
+      started_ = false;
       return BT::NodeStatus::SUCCESS;
     }
   }
@@ -60,6 +61,7 @@ BT::NodeStatus WaitForCarsGone::tick()
   if (max_wait_ > 0.0 && (now - start_time_).seconds() >= max_wait_) {
     RCLCPP_WARN(node_->get_logger(),
       "避车等待超过最大时长 %.1f 秒，强制结束", max_wait_);
+    started_ = false;
     return BT::NodeStatus::SUCCESS;
   }
 

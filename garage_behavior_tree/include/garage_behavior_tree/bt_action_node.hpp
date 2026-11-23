@@ -19,6 +19,7 @@
 #include <string>
 #include <chrono>
 #include <atomic>
+#include <cstdint>
 
 #include "behaviortree_cpp_v3/action_node.h"
 #include "nav2_util/node_utils.hpp"
@@ -188,7 +189,7 @@ public:
   BT::NodeStatus tick() override
   {
     // 在开始时检查取消标志
-    if (cancel_requested_.load()) {
+    if (status() != BT::NodeStatus::IDLE && cancel_requested_.load()) {
       RCLCPP_INFO(node_->get_logger(), "tick() detected cancel_requested for %s", action_name_.c_str());
       cancel_requested_.store(false);
       return BT::NodeStatus::FAILURE;
@@ -320,33 +321,40 @@ public:
    */
   void halt() override
   {
-    RCLCPP_WARN(node_->get_logger(), "BtActionNode::halt() called for %s - forcing immediate cancellation", 
-                action_name_.c_str());
-    
-    // 1. 设置取消标志
     cancel_requested_.store(true);
-    
-    // 2. 尝试发送取消请求给action server（不等待结果）
-    if (should_cancel_goal()) {
-      RCLCPP_INFO(node_->get_logger(), "Sending cancel request to %s", action_name_.c_str());
-      auto future_cancel = action_client_->async_cancel_goal(goal_handle_);
-      // 不等待，让取消请求在后台处理
-      // 如果需要确保发送成功，可以短暂等待，但不要阻塞
-      // callback_group_executor_.spin_until_future_complete(future_cancel, std::chrono::milliseconds(50));
+    // 先使旧请求的反馈/结果失效，避免取消后的晚到结果改写新一轮状态。
+    ++goal_generation_;
+    if (future_goal_handle_) {
+      if (callback_group_executor_.spin_until_future_complete(
+          *future_goal_handle_, server_timeout_) != rclcpp::FutureReturnCode::SUCCESS)
+      {
+        throw BT::RuntimeError("取消时未取得 Action 目标确认: ", action_name_);
+      }
+      goal_handle_ = future_goal_handle_->get();
+      future_goal_handle_.reset();
     }
-    
-    // 3. 关键：强制设置结果可用，让tick立即退出
+
+    if (should_cancel_goal()) {
+      auto future_cancel = action_client_->async_cancel_goal(goal_handle_);
+      if (callback_group_executor_.spin_until_future_complete(
+          future_cancel, server_timeout_) != rclcpp::FutureReturnCode::SUCCESS)
+      {
+        throw BT::RuntimeError("未收到 Action 取消确认: ", action_name_);
+      }
+      const auto response = future_cancel.get();
+      if (response->goals_canceling.empty() && should_cancel_goal()) {
+        throw BT::RuntimeError("Action 拒绝取消: ", action_name_);
+      }
+    }
+
     goal_result_available_ = true;
     result_.code = rclcpp_action::ResultCode::CANCELED;
-    
-    // 4. 重置goal_handle相关状态
     goal_handle_.reset();
     future_goal_handle_.reset();
-    
-    // 5. 立即重置节点状态
+    feedback_.reset();
+    goal_updated_ = false;
     setStatus(BT::NodeStatus::IDLE);
-    
-    RCLCPP_INFO(node_->get_logger(), "BtActionNode::halt() completed for %s", action_name_.c_str());
+    RCLCPP_INFO(node_->get_logger(), "已中断 Action: %s", action_name_.c_str());
   }
 
 protected:
@@ -380,9 +388,14 @@ protected:
   void send_new_goal()
   {
     goal_result_available_ = false;
+    feedback_.reset();
+    const auto generation = ++goal_generation_;
     auto send_goal_options = typename rclcpp_action::Client<ActionT>::SendGoalOptions();
     send_goal_options.result_callback =
-      [this](const typename rclcpp_action::ClientGoalHandle<ActionT>::WrappedResult & result) {
+      [this, generation](const typename rclcpp_action::ClientGoalHandle<ActionT>::WrappedResult & result) {
+        if (generation != goal_generation_ || cancel_requested_.load() || !goal_handle_) {
+          return;
+        }
         if (future_goal_handle_) {
           RCLCPP_DEBUG(
             node_->get_logger(),
@@ -400,9 +413,13 @@ protected:
         }
       };
     send_goal_options.feedback_callback =
-      [this](typename rclcpp_action::ClientGoalHandle<ActionT>::SharedPtr,
+      [this, generation](typename rclcpp_action::ClientGoalHandle<ActionT>::SharedPtr handle,
         const std::shared_ptr<const typename ActionT::Feedback> feedback) {
-        feedback_ = feedback;
+        if (generation == goal_generation_ && !cancel_requested_.load() &&
+          goal_handle_ && goal_handle_->get_goal_id() == handle->get_goal_id())
+        {
+          feedback_ = feedback;
+        }
       };
 
     future_goal_handle_ = std::make_shared<
@@ -507,6 +524,7 @@ protected:
   
   // 取消请求标志
   std::atomic<bool> cancel_requested_{false};
+  uint64_t goal_generation_{0};
 };
 
 }  // namespace garage_utils_pkg

@@ -1,27 +1,45 @@
 <root main_tree_to_execute="MainTree">
-  <BehaviorTree ID="MainTree">  
-    
-    <Fallback>
-      <PipelineSequence>
-        <RateController hz="1">
-          <Inverter>
-            <FindCarAvoidancePoint polygons="{polygons}" car_pose="{car_pose}" car_size="{car_size}" free_point="{free_point}" goal="{goal}" state="{state}" />
-          </Inverter>
-        </RateController>
-        <SingleTrigger>
-          <ComputeRightEdgePath polygons="{polygons}" car_pose="{car_pose}" garage_path="{garage_path}" goals="{goals}" state="{state}" />
-        </SingleTrigger>
-        <SubTree ID="NavigateThroughPoses" __shared_blackboard="true" />
-      </PipelineSequence>
+  <BehaviorTree ID="MainTree">
+    <ReactiveFallback>
+      <Sequence name="ParkApprovedPoint">
+        <FarSideGuard command="has_approved"/>
+        <WeltModelNode goal_pose="{approved_point}" state="{state}"/>
+        <WaitForCarsGone idle_timeout="15" max_wait="60" topic_name="/car_information"/>
+      </Sequence>
 
-      <Sequence>
-        <!-- <SubTree ID="NavigatoToPose" __shared_blackboard="true" /> -->
-        <WeltModelNode goal_pose="{free_point}" state="{state}" />
-        <!-- max_wait=-1 表示不启用总超时;要启用时改成数值即可, max_wait="60" -->
-        <WaitForCarsGone idle_timeout="15" max_wait="60" />
-      </Sequence>      
-      
-    </Fallback>
+      <!-- 首次找点独立执行；尚未进入靠右时不启动无动车退出计时。 -->
+      <Sequence name="InitialSearch">
+        <Inverter>
+          <FarSideGuard command="skip_initial"/>
+        </Inverter>
+        <FindCarAvoidancePoint polygons="{polygons}" car_pose="{car_pose}" car_size="{car_size}" enable_far_side="false" free_point="{free_point}" goal="{goal}" candidate_point="{candidate_point}" point_side="{point_side}" state="{state}"/>
+        <FarSideGuard command="approve"/>
+        <FarSideGuard command="yield"/>
+      </Sequence>
+
+      <!-- 连续无动车时中断整个靠右分支，包括尚未返回的找点 Action。 -->
+      <StopWhenCarsGone idle_timeout="3.0" topic_name="/car_information_all">
+        <Sequence name="RightEdge">
+          <FarSideGuard command="commit"/>
+          <PipelineSequence>
+            <RateController hz="1.0">
+              <Inverter>
+                <Sequence>
+                  <FindCarAvoidancePoint polygons="{polygons}" car_pose="{car_pose}" car_size="{car_size}" enable_far_side="false" free_point="{free_point}" goal="{goal}" candidate_point="{candidate_point}" point_side="{point_side}" state="{state}"/>
+                  <FarSideGuard command="approve"/>
+                </Sequence>
+              </Inverter>
+            </RateController>
+            <RunOnce>
+              <ComputeRightEdgePath polygons="{polygons}" car_pose="{car_pose}" garage_path="{garage_path}" goals="{goals}" state="{state}"/>
+            </RunOnce>
+            <SubTree ID="NavigateThroughPoses" __shared_blackboard="true"/>
+          </PipelineSequence>
+        </Sequence>
+      </StopWhenCarsGone>
+
+      <FarSideGuard command="hold_if_point"/>
+    </ReactiveFallback>
   </BehaviorTree>
 
   <BehaviorTree ID="NavigateThroughPoses">
@@ -36,7 +54,7 @@
         <RateController hz="10.0">
           <RemovePassedGoals input_goals="{goals}" output_goals="{goals}" radius="1.0"/>
         </RateController>
-        <SingleTrigger>
+        <RunOnce>
           <RecoveryNode number_of_retries="2" name="ComputePathThroughPoses">
             <Sequence>
               <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="2.0"/>
@@ -55,7 +73,7 @@
               <Wait wait_duration="0.5"/>
             </Sequence>
           </RecoveryNode>
-        </SingleTrigger>
+        </RunOnce>
         <RecoveryNode number_of_retries="2" name="FollowPath">
           <FollowPath path="{path}" controller_id="FollowPath"/>
           <Sequence>
@@ -82,53 +100,4 @@
       </ReactiveFallback>
     </RecoveryNode>
   </BehaviorTree>
-
-  <BehaviorTree ID="NavigatoToPose">
-    <RecoveryNode number_of_retries="6" name="NavigateRecovery">
-      <PipelineSequence name="NavigateWithReplanning">
-        <RecoveryNode number_of_retries="1" name="ComputePathToPose">
-            <Fallback>
-              <ReactiveSequence>
-                <Inverter>
-                  <PathExpiringTimer seconds="1000" path="{path}"/>
-                </Inverter>
-                <Inverter>
-                  <GlobalUpdatedGoal/>
-                </Inverter>
-              </ReactiveSequence>
-              <Sequence>
-                 <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="2.0"/>
-                 <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
-              </Sequence>
-            </Fallback>
-            <Sequence>
-              <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="2.0"/>
-            </Sequence>
-          </RecoveryNode>
-        <RateController hz="5.0">
-          <IsCollision/>
-        </RateController>
-        <RecoveryNode number_of_retries="6" name="FollowPath">
-          <FollowPath path="{path}" controller_id="FollowPath"/>
-          <Sequence>
-            <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="2.0"/>
-            <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
-          </Sequence>
-        </RecoveryNode>
-      </PipelineSequence>
-      <ReactiveFallback name="RecoveryFallback">
-        <GoalUpdated/>
-        <Sequence name="RecoveryActions">
-          <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="local_costmap/clear_except_local_costmap" reset_distance="2.0"/>
-          <ClearCostmapExceptRegion name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_except_global_costmap" reset_distance="2.0"/>
-          <Fallback>
-            <IsCollision/>
-            <CollisionRecover/>
-          </Fallback>
-        </Sequence>
-      </ReactiveFallback>
-    </RecoveryNode>
-  </BehaviorTree>
-
-
 </root>

@@ -8,18 +8,26 @@
 #include "geometry_msgs/msg/polygon.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include <algorithm>
+#include "garage_utils/footprint_check.hpp"
 
 
 namespace garage_utils_pkg
 {
         
+        struct PathSearchReport {
+          size_t planned{0}, checked{0}, attempts{0}, interrupted{0};
+          double x{0}, y{0};
+          std::string reason;
+        };
+
         class GeneratePath
         {
         public:
                 explicit GeneratePath(rclcpp::Node::SharedPtr node);
                 ~GeneratePath();
 
-                void process_(const std::vector<EnhancedPoint>& points, const std::vector<geometry_msgs::msg::Polygon>& polygons, bool path_inverse);
+                void process_(const std::vector<EnhancedPoint>& points, const std::vector<geometry_msgs::msg::Polygon>& polygons, bool path_inverse,
+                  const geometry_msgs::msg::Pose & robot, const FootprintCheck & checker, PathSearchReport & report);
                 int find_polygon_index(const EnhancedPoint& pt1, const EnhancedPoint& pt2, const std::vector<geometry_msgs::msg::Polygon>& polygons);
                 std::pair<Point, Point> find_edge(const EnhancedPoint& pt1, const EnhancedPoint& pt2, const EnhancedRect& rect);
                 nav_msgs::msg::Path generate_path_for_one_segment(const EnhancedPoint& pt1, const EnhancedPoint& pt2, const geometry_msgs::msg::Polygon& polygons);
@@ -58,6 +66,8 @@ namespace garage_utils_pkg
 
                 // params
                 double offset_;
+                double offset_max_;
+                double offset_step_;
                 double resolution_;
         };
 } // end of namespace

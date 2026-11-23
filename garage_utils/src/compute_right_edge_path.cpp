@@ -1,4 +1,6 @@
 #include "garage_utils/compute_right_edge_path.hpp"
+#include <chrono>
+#include <stdexcept>
 
 namespace garage_utils_pkg
 {
@@ -14,6 +16,18 @@ namespace garage_utils_pkg
                 this->tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
                 this->tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*this->tf_buffer_);                
                 
+                costmap_sub_ = create_subscription<nav2_msgs::msg::Costmap>(
+                    "/global_costmap/costmap_raw", rclcpp::QoS(1).best_effort(),
+                    [this](nav2_msgs::msg::Costmap::ConstSharedPtr msg) {
+                        std::lock_guard<std::mutex> lock(map_mutex_);
+                        costmap_ = msg;
+                    });
+                footprint_sub_ = create_subscription<geometry_msgs::msg::PolygonStamped>(
+                    "/global_costmap/published_footprint", rclcpp::QoS(1).best_effort(),
+                    [this](geometry_msgs::msg::PolygonStamped::ConstSharedPtr msg) {
+                        std::lock_guard<std::mutex> lock(map_mutex_);
+                        footprint_ = msg;
+                    });
                 std::vector<geometry_msgs::msg::Polygon>().swap(polygons_);
 
                 auto callback_group = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -33,6 +47,7 @@ namespace garage_utils_pkg
         {
                 delete path_searcher_;
                 delete model_generator_;
+                delete path_generator_;
         }
 
         void ComputeRightEdgePathActionServer::init_params()
@@ -43,7 +58,9 @@ namespace garage_utils_pkg
                 this->declare_parameter<double>("robot_x_test", 0.0);
                 this->declare_parameter<double>("robot_y_test", 3.5);
                 this->declare_parameter<bool>("strict_mode", true);                
-                this->declare_parameter<double>("offset", 0.8);
+                this->declare_parameter<double>("offset_min", 0.7);
+                this->declare_parameter<double>("offset_max", 4.0);
+                this->declare_parameter<double>("offset_step", 0.5);
                 this->declare_parameter<double>("resolution", 1.0);
                 this->declare_parameter<bool>("allow_inverse", false);
 
@@ -53,7 +70,7 @@ namespace garage_utils_pkg
                 this->robot_x_test = this->get_parameter_or("robot_x_test", 0.0);
                 this->robot_y_test = this->get_parameter_or("robot_y_test", 3.5);
                 this->strict_mode = this->get_parameter_or("strict_mode", true);
-                this->offset_ = this->get_parameter_or("offset", 0.8);
+                this->offset_ = this->get_parameter_or("offset_min", 0.7);
                 this->resolution_ = this->get_parameter_or("resolution", 1.0);
                 this->allow_inverse_ = this->get_parameter_or("allow_inverse", false);
 
@@ -64,7 +81,7 @@ namespace garage_utils_pkg
                 RCLCPP_INFO(get_logger(), "robot_y_test: %f", robot_y_test);
                 RCLCPP_INFO(get_logger(), "test: %s", test?"true":"false");
                 RCLCPP_INFO(get_logger(), "strict_mode: %s", strict_mode?"true":"false");
-                RCLCPP_INFO(get_logger(), "offset: %f", this->offset_);
+                RCLCPP_INFO(get_logger(), "offset_min: %f", this->offset_);
                 RCLCPP_INFO(get_logger(), "resolution: %f", this->resolution_);
                 RCLCPP_INFO(get_logger(), "allow_inverse: %s", allow_inverse_?"true":"false");
                 RCLCPP_INFO(get_logger(), "------------------------------------- ");
@@ -107,26 +124,7 @@ namespace garage_utils_pkg
         {
                 (void)uuid;
 
-                if (!this->model_generator_)
-                {
-                        RCLCPP_INFO(get_logger(), "init [ model_generator_, path_searcher_, path_generator_ ] .");
-                        auto node_ptr = shared_from_this();
-                        this->model_generator_ = new GenerateModel(node_ptr);
-                        this->path_searcher_ = new ShortestPathSearch(node_ptr);
-                        this->path_generator_ = new GeneratePath(node_ptr);
-                }
-
-                RCLCPP_INFO(this->get_logger(), "Received goal request with %ld polygons, the pose of car (%f, %f).", 
-                        goal->polygons.size(), goal->car_pose.pose.position.x, goal->car_pose.pose.position.y);
-
-                // 保存car_pose和polygons
-                this->car_pose_ = goal->car_pose;
-                this->polygons_ = goal->polygons;
-
-                // 打印 goal里的polygons
-                RCLCPP_INFO(get_logger(), "print polygons in origin goal.");
-                print_polygons(polygons_);
-
+                RCLCPP_INFO(get_logger(), "Received goal with %zu polygons", goal->polygons.size());
                 return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;                
         }
 
@@ -147,21 +145,41 @@ namespace garage_utils_pkg
 
         void ComputeRightEdgePathActionServer::execute(const std::shared_ptr<GoalHandleComputeRightEdgePath> goal_handle)
         {
-                // define result
+                std::lock_guard<std::mutex> execution_lock(execution_mutex_);
+                const auto started = std::chrono::steady_clock::now();
+                PathSearchReport report;
+                path_.poses.clear();
                 auto result = std::make_shared<garage_utils_msgs::action::ComputeRightEdgePath::Result>();
 
                 try
                 {
+                        polygons_ = goal_handle->get_goal()->polygons;
+                        car_pose_ = goal_handle->get_goal()->car_pose;
+                        path_inverse_ = false;
+                        auto node_ptr = shared_from_this();
+                        if (!model_generator_) {model_generator_ = new GenerateModel(node_ptr);}
+                        if (!path_searcher_) {path_searcher_ = new ShortestPathSearch(node_ptr);}
+                        if (!path_generator_) {path_generator_ = new GeneratePath(node_ptr);}
+
+                        nav2_msgs::msg::Costmap::ConstSharedPtr map;
+                        geometry_msgs::msg::PolygonStamped::ConstSharedPtr footprint;
+                        {
+                            std::lock_guard<std::mutex> lock(map_mutex_);
+                            map = costmap_;
+                            footprint = footprint_;
+                        }
+                        if (!map || !footprint) {
+                            throw std::runtime_error("尚未收到代价地图或 footprint");
+                        }
+                        const auto local_footprint = tf_buffer_->transform(*footprint,
+                            "base_link", tf2::durationFromSec(0.1));
+                        FootprintCheck checker(*map, local_footprint.polygon);
+
                         // 检查goal的合法性
                         std::string reason;
                         if (!goal_checker(goal_handle->get_goal(), reason))
                         {
-                                RCLCPP_INFO(this->get_logger(), "reject the goal, for reason: %s", reason.c_str());
-                                auto result = std::make_shared<ComputeRightEdgePath::Result>();
-                                result->reason = reason;
-                                result->success = false;
-                                goal_handle->abort(result);
-                                return;
+                                throw std::runtime_error(reason);
                         }
                         
                         RCLCPP_INFO(get_logger(), "Begin to compute path following right edge.");
@@ -423,7 +441,12 @@ namespace garage_utils_pkg
                                 } 
                         }     
                         
-                        path_generator_->process_(points_ordered, this->polygons_, this->path_inverse_);
+                        geometry_msgs::msg::Pose robot_pose;
+                        robot_pose.position.x = robot_x;
+                        robot_pose.position.y = robot_y;
+                        robot_pose.orientation = tf2::toMsg(map_robot_tf.getRotation());
+                        path_generator_->process_(points_ordered, this->polygons_, this->path_inverse_,
+                            robot_pose, checker, report);
                         this->path_ = path_generator_->get_path();
 
                         // 给path添加时间戳
@@ -435,6 +458,12 @@ namespace garage_utils_pkg
                                 this->path_.poses[i].pose.position.z = i;
                         }
 
+                        if (goal_handle->is_canceling()) {
+                            result->reason = "算路已取消";
+                            goal_handle->canceled(result);
+                            RCLCPP_INFO(get_logger(), "[靠边路径] 已取消，原计划 %zu 点，已检查 %zu 点，返回 0 点", report.planned, report.checked);
+                            return;
+                        }
                         // 4、publish path
                         this->path_pub_->publish(this->path_);
 
@@ -469,7 +498,22 @@ namespace garage_utils_pkg
                         result->success = false;
                         result->reason = e;
                         goal_handle->abort(result);
-                }                          
+                }
+                const double elapsed = std::chrono::duration<double, std::milli>(
+                    std::chrono::steady_clock::now()-started).count();
+                const size_t returned = result->success ? result->poses.size() : 0;
+                if (report.interrupted != 0) {
+                    RCLCPP_WARN(get_logger(),
+                        "[靠边路径] 原计划 %zu 点，已检查 %zu 点，返回前 %zu 点；第 %zu 点中断，参考位置=(%.3f, %.3f)，最大偏移=%.2f m，横向尝试 %zu 次，耗时 %.3f ms，最后失败原因=%s",
+                        report.planned, report.checked, returned, report.interrupted,
+                        report.x, report.y, get_parameter("offset_max").as_double(),
+                        report.attempts, elapsed, report.reason.c_str());
+                } else {
+                    RCLCPP_INFO(get_logger(),
+                        "[靠边路径] 原计划 %zu 点，已检查 %zu 点，返回 %zu 点，横向尝试 %zu 次，耗时 %.3f ms，结果=%s",
+                        report.planned, report.checked, returned, report.attempts, elapsed,
+                        result->success ? "完整通过，无中断" : result->reason.c_str());
+                }
         }
 
         double ComputeRightEdgePathActionServer::theta_between_two_edges(Point seg1_pt1, Point seg1_pt2, Point seg2_pt1, Point seg2_pt2)
@@ -640,6 +684,7 @@ namespace garage_utils_pkg
         {
                 RCLCPP_INFO(get_logger(), "robot_pose: (%f, %f)", robot_x, robot_y);
 
+                if (polygons_.empty()) {throw std::runtime_error("没有剩余可裁剪的通道");}
                 size_t current_index = get_current_polygon_index(robot_x, robot_y, polygons_);
                 RCLCPP_INFO(get_logger(), "current_index: %ld", current_index);
                 auto polygon_first = this->polygons_[current_index];                
@@ -793,7 +838,7 @@ namespace garage_utils_pkg
         bool ComputeRightEdgePathActionServer::goal_checker(std::shared_ptr<const ComputeRightEdgePath::Goal> goal, std::string& reason)
         {
                 bool ret = true;
-
+                if (goal->polygons.empty()) {reason = "没有通道"; return false;}
                 auto polygons = goal->polygons;
                 for (size_t i = 0; i < polygons.size(); i++)
                 {

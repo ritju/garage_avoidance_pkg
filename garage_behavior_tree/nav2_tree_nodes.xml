@@ -6,6 +6,10 @@
 -->
 <root>
   <TreeNodesModel>
+    <Decorator ID="StopWhenCarsGone">
+      <input_port name="idle_timeout" default="3.0">连续未收到非空动车消息的退出时间（秒）</input_port>
+      <input_port name="topic_name" default="/car_information">动车信息话题</input_port>
+    </Decorator>
     <!-- ############################### ACTION NODES ################################# -->  
 
     <Action ID="ComputeRightEdgePath">

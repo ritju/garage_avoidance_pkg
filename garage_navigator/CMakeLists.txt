@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 project(garage_navigator)
 
 find_package(ament_cmake REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 find_package(nav2_common REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
@@ -35,6 +36,7 @@ set(library_name ${executable_name}_core)
 
 set(dependencies
   ament_cmake
+  ament_index_cpp
   rclcpp
   rclcpp_action
   rclcpp_lifecycle
